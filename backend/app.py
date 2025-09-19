@@ -304,6 +304,40 @@ def clear_all_tasks():
             'message': f'Server error: {str(e)}'
         }), 500
 
+@app.route('/api/analyze-priority', methods=['POST'])
+def analyze_priority():
+    """Get detailed priority analysis for a single task."""
+    try:
+        data = request.get_json()
+        
+        if not data or 'task' not in data:
+            return jsonify({
+                'success': False,
+                'message': 'No task provided'
+            }), 400
+        
+        task = data['task'].strip()
+        
+        if not task:
+            return jsonify({
+                'success': False,
+                'message': 'Empty task provided'
+            }), 400
+        
+        # Get detailed priority analysis
+        analysis = task_processor.get_priority_analysis(task)
+        
+        return jsonify({
+            'success': True,
+            'analysis': analysis
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Server error: {str(e)}'
+        }), 500
+
 @app.route('/api/stats', methods=['GET'])
 def get_stats():
     """Get task statistics."""
