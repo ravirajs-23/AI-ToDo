@@ -1,16 +1,22 @@
 """
 Core AI processing engine for task extraction, priority classification, and categorization
-using Hugging Face transformers for local processing.
+using ChatGPT and Gemini APIs for advanced AI processing.
 """
 
 import re
 import json
-from typing import List, Dict, Any
-from transformers import pipeline, AutoTokenizer, AutoModelForSequenceClassification
-import torch
+import os
+from typing import List, Dict, Any, Optional
+from datetime import datetime, timedelta
+import openai
+import google.generativeai as genai
+from dotenv import load_dotenv
 import nltk
 from nltk.tokenize import sent_tokenize, word_tokenize
 from nltk.corpus import stopwords
+
+# Load environment variables
+load_dotenv()
 
 # Download required NLTK data
 try:
@@ -25,45 +31,20 @@ except LookupError:
 
 
 class TaskProcessor:
-    """Main class for processing raw task text using Hugging Face models."""
+    """Main class for processing raw task text using ChatGPT and Gemini APIs."""
     
-    def __init__(self):
-        self.priority_classifier = None
-        self.category_classifier = None
+    def __init__(self, ai_provider: str = "chatgpt"):
+        """
+        Initialize the TaskProcessor with AI provider.
+        
+        Args:
+            ai_provider: "chatgpt" or "gemini"
+        """
+        self.ai_provider = ai_provider.lower()
         self.stop_words = set(stopwords.words('english'))
-        self._initialize_models()
-    
-    def _initialize_models(self):
-        """Initialize Hugging Face models for classification."""
-        try:
-            # Use a lightweight model for priority classification
-            # We'll create a custom classifier based on keywords and patterns
-            print("Initializing AI models...")
-            
-            # For now, we'll use rule-based classification
-            # In a production system, you'd train custom models
-            self.priority_keywords = {
-                'high': ['urgent', 'asap', 'deadline', 'critical', 'important', 'immediately', 'today', 'now', 'blocker', 'time-sensitive', 'tmw', 'tomorrow', 'eod', 'end of day'],
-                'medium': ['soon', 'this week', 'moderate', 'should', 'need to', 'this week', 'next week'],
-                'low': ['eventually', 'sometime', 'when possible', 'optional', 'nice to have', 'nice-to-have']
-            }
-            
-            self.category_keywords = {
-                'work': ['meeting', 'client', 'project', 'presentation', 'report', 'deadline', 'email', 'call', 'ppt', 'deck', 'aws', 'logs', 'ssl', 'cert', 'portal', 'intern', 'bug', 'navbar', 'mobile', 's3', 'upload', 'timesheet', 'townhall', 'domain', 'readme', 'invoice', 'followup', 'demo', 'export', 'data', 'report'],
-                'admin': ['paperwork', 'forms', 'billing', 'invoice', 'expense', 'hr', 'admin', 'travel', 'reimbursement', 'hiring', 'loop', 'q3'],
-                'meetings': ['meeting', 'call', 'conference', 'discussion', 'sync', 'standup', 'retro', '1:1', 'amit'],
-                'personal': ['grocery', 'doctor', 'family', 'personal', 'home', 'shopping', 'mom', 'bday', 'birthday', 'gift', 'internet', 'bill']
-            }
-            
-            print("AI models initialized successfully!")
-            
-        except Exception as e:
-            print(f"Error initializing models: {e}")
-            # Fallback to rule-based approach
-            self._initialize_fallback()
-    
-    def _initialize_fallback(self):
-        """Initialize fallback rule-based classification."""
+        self._initialize_ai_client()
+        
+        # Fallback rule-based patterns
         self.priority_keywords = {
             'high': ['urgent', 'asap', 'deadline', 'critical', 'important', 'immediately', 'today', 'now', 'blocker', 'time-sensitive', 'tmw', 'tomorrow', 'eod', 'end of day'],
             'medium': ['soon', 'this week', 'moderate', 'should', 'need to', 'this week', 'next week'],
@@ -71,14 +52,99 @@ class TaskProcessor:
         }
         
         self.category_keywords = {
-            'work': ['meeting', 'client', 'project', 'presentation', 'report', 'deadline', 'email', 'call', 'ppt', 'deck', 'aws', 'logs', 'ssl', 'cert', 'portal', 'intern', 'bug', 'navbar', 'mobile', 's3', 'upload', 'timesheet', 'townhall', 'domain', 'readme', 'invoice', 'followup', 'demo', 'export', 'data', 'report'],
+            'work': ['meeting', 'client', 'project', 'presentation', 'report', 'deadline', 'email', 'call', 'ppt', 'deck', 'aws', 'logs', 'ssl', 'cert', 'portal', 'intern', 'bug', 'navbar', 'mobile', 's3', 'upload', 'timesheet', 'townhall', 'domain', 'readme', 'invoice', 'followup', 'demo', 'export', 'data', 'report', 'team', 'lunch', 'building', 'activity', 'software', 'update', 'inbox', 'slides'],
             'admin': ['paperwork', 'forms', 'billing', 'invoice', 'expense', 'hr', 'admin', 'travel', 'reimbursement', 'hiring', 'loop', 'q3'],
             'meetings': ['meeting', 'call', 'conference', 'discussion', 'sync', 'standup', 'retro', '1:1', 'amit'],
-            'personal': ['grocery', 'doctor', 'family', 'personal', 'home', 'shopping', 'mom', 'bday', 'birthday', 'gift', 'internet', 'bill']
+            'personal': ['grocery', 'doctor', 'family', 'personal', 'home', 'shopping', 'mom', 'bday', 'birthday', 'gift', 'internet', 'bill', 'electricity', 'power', 'recharge', 'payment', 'dentist', 'appointment', 'insurance', 'vehicle', 'travel', 'tickets', 'snacks']
         }
     
+    def _initialize_ai_client(self):
+        """Initialize the AI client based on the provider."""
+        try:
+            if self.ai_provider == "chatgpt":
+                api_key = os.getenv('OPENAI_API_KEY')
+                if not api_key:
+                    raise ValueError("OPENAI_API_KEY not found in environment variables")
+                openai.api_key = api_key
+                self.client = openai.OpenAI(api_key=api_key)
+                print("✅ ChatGPT client initialized successfully!")
+                
+            elif self.ai_provider == "gemini":
+                api_key = os.getenv('GEMINI_API_KEY')
+                if not api_key:
+                    raise ValueError("GEMINI_API_KEY not found in environment variables")
+                genai.configure(api_key=api_key)
+                self.model = genai.GenerativeModel('gemini-pro')
+                print("✅ Gemini client initialized successfully!")
+                
+            else:
+                raise ValueError(f"Unsupported AI provider: {self.ai_provider}")
+                
+        except Exception as e:
+            print(f"❌ Error initializing AI client: {e}")
+            print("🔄 Falling back to rule-based processing...")
+            self.client = None
+            self.model = None
+    
     def extract_tasks(self, raw_text: str) -> List[str]:
-        """Extract individual tasks from raw text with improved compound task splitting."""
+        """Extract individual tasks from raw text using AI."""
+        try:
+            if self.client or self.model:
+                return self._extract_tasks_with_ai(raw_text)
+            else:
+                return self._extract_tasks_fallback(raw_text)
+        except Exception as e:
+            print(f"❌ AI task extraction failed: {e}")
+            return self._extract_tasks_fallback(raw_text)
+    
+    def _extract_tasks_with_ai(self, raw_text: str) -> List[str]:
+        """Extract tasks using AI API."""
+        prompt = f"""
+You are a task extraction expert. Extract individual tasks from the following text and return them as a JSON array of strings.
+
+Rules:
+1. Split compound tasks into separate individual tasks
+2. Handle dependencies (e.g., "before that" means prerequisite)
+3. Extract bill amounts and create separate tasks for each bill
+4. Handle project-specific tasks (e.g., "for CABP project as well as for sentilink" = 2 tasks)
+5. Clean up task descriptions (remove unnecessary words, capitalize properly)
+6. Return only the task descriptions, no additional text
+
+Input text: "{raw_text}"
+
+Return format: ["task1", "task2", "task3", ...]
+"""
+        
+        try:
+            if self.ai_provider == "chatgpt":
+                response = self.client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {"role": "system", "content": "You are a task extraction expert. Return only valid JSON arrays."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.1,
+                    max_tokens=1000
+                )
+                result = response.choices[0].message.content.strip()
+                
+            elif self.ai_provider == "gemini":
+                response = self.model.generate_content(prompt)
+                result = response.text.strip()
+            
+            # Parse JSON response
+            tasks = json.loads(result)
+            if isinstance(tasks, list):
+                return [task.strip() for task in tasks if task.strip()]
+            else:
+                raise ValueError("AI response is not a list")
+                
+        except Exception as e:
+            print(f"❌ AI API call failed: {e}")
+            return self._extract_tasks_fallback(raw_text)
+    
+    def _extract_tasks_fallback(self, raw_text: str) -> List[str]:
+        """Fallback task extraction using rule-based approach."""
         # Clean the input text first
         cleaned_text = self._clean_input_text(raw_text)
         
@@ -89,33 +155,63 @@ class TaskProcessor:
         email_tasks = self._extract_email_tasks(cleaned_text)
         if email_tasks:
             all_tasks.extend(email_tasks)
+            return self._clean_task_list(all_tasks)
         
-        # Strategy 2: Split by line breaks (for structured input) - ALWAYS check for newlines
-        if '\n' in cleaned_text and not email_tasks:
+        # Strategy 2: Combined approach - handle both line breaks AND semicolons
+        # First split by line breaks, then split each line by separators
+        if '\n' in cleaned_text:
             line_tasks = [task.strip() for task in cleaned_text.split('\n') if task.strip()]
-            for task in line_tasks:
-                # Don't further split line-separated tasks unless they contain compound indicators
-                if any(indicator in task.lower() for indicator in [' and ', ' also ', ';', ' then ']):
-                    compound_tasks = self._split_compound_task(task)
+            for line in line_tasks:
+                # For each line, check if it contains separators
+                if ';' in line:
+                    # Split by semicolons first
+                    semicolon_tasks = [task.strip() for task in line.split(';') if task.strip()]
+                    for task in semicolon_tasks:
+                        # Then check for commas and other compound indicators
+                        if ',' in task and self._is_comma_separator(task):
+                            # Split by commas if they separate distinct tasks
+                            comma_tasks = [t.strip() for t in task.split(',') if t.strip()]
+                            for comma_task in comma_tasks:
+                                if any(indicator in comma_task.lower() for indicator in [' and ', ' also ', ' then ']):
+                                    compound_tasks = self._split_compound_task(comma_task)
+                                    all_tasks.extend(compound_tasks)
+                                else:
+                                    all_tasks.append(comma_task)
+                        elif any(indicator in task.lower() for indicator in [' and ', ' also ', ' then ']):
+                            compound_tasks = self._split_compound_task(task)
+                            all_tasks.extend(compound_tasks)
+                        else:
+                            all_tasks.append(task)
+                elif ',' in line and self._is_comma_separator(line):
+                    # Split by commas if they separate distinct tasks
+                    comma_tasks = [t.strip() for t in line.split(',') if t.strip()]
+                    for comma_task in comma_tasks:
+                        if any(indicator in comma_task.lower() for indicator in [' and ', ' also ', ' then ']):
+                            compound_tasks = self._split_compound_task(comma_task)
+                            all_tasks.extend(compound_tasks)
+                        else:
+                            all_tasks.append(comma_task)
+                elif any(indicator in line.lower() for indicator in [' and ', ' also ', ' then ']):
+                    # Handle other compound indicators
+                    compound_tasks = self._split_compound_task(line)
                     all_tasks.extend(compound_tasks)
                 else:
-                    all_tasks.append(task)
+                    # Single task on this line
+                    all_tasks.append(line)
         
-        # Strategy 3: Split by semicolons (common separator)
-        elif ';' in cleaned_text and not email_tasks:
+        # Strategy 3: Split by semicolons only (fallback when no line breaks)
+        elif ';' in cleaned_text:
             semicolon_tasks = [task.strip() for task in cleaned_text.split(';') if task.strip()]
             for task in semicolon_tasks:
                 compound_tasks = self._split_compound_task(task)
                 all_tasks.extend(compound_tasks)
         
-        # Strategy 4: Split by sentence boundaries and compound indicators
+        # Strategy 4: Split by sentence boundaries (last resort)
         else:
-            # Split by sentence boundaries first, but handle complex sentences better
             sentences = re.split(r'[.!?]+', cleaned_text)
             for sentence in sentences:
                 sentence = sentence.strip()
                 if sentence:
-                    # Handle "then" or "lastly" within sentences
                     if ' then ' in sentence.lower() or ' lastly ' in sentence.lower():
                         parts = re.split(r'\s+(?:then|lastly)\s+', sentence, flags=re.IGNORECASE)
                         for part in parts:
@@ -127,19 +223,12 @@ class TaskProcessor:
                         compound_tasks = self._split_compound_task(sentence)
                         all_tasks.extend(compound_tasks)
         
-        # Strategy 5: Handle complex sentences with multiple actions separated by "then" or "lastly"
-        if not all_tasks and (' then ' in cleaned_text.lower() or ' lastly ' in cleaned_text.lower()):
-            # Split by "then" or "lastly"
-            parts = re.split(r'\s+(?:then|lastly)\s+', cleaned_text, flags=re.IGNORECASE)
-            for part in parts:
-                part = part.strip()
-                if part:
-                    compound_tasks = self._split_compound_task(part)
-                    all_tasks.extend(compound_tasks)
-        
-        # Clean up all tasks
+        return self._clean_task_list(all_tasks)
+    
+    def _clean_task_list(self, tasks: List[str]) -> List[str]:
+        """Clean and normalize a list of extracted tasks."""
         cleaned_tasks = []
-        for task in all_tasks:
+        for task in tasks:
             # Remove common prefixes and question words
             task = re.sub(r'^(can we|could you|please|finish|complete|do|make|create|call|check|send|review|need to|ping|update|rotate|ship|restart|share|archive)\s+', '', task, flags=re.IGNORECASE)
             # Remove trailing punctuation
@@ -149,11 +238,10 @@ class TaskProcessor:
             # Capitalize first letter
             task = task.capitalize()
             
-            # Skip very short or meaningless tasks, but handle project names
+            # Skip very short or meaningless tasks
             if len(task) > 5 and not task.lower() in ['for', 'on', 'in', 'at', 'to', 'from', 'with', 'by', 'the', 'a', 'an']:
                 cleaned_tasks.append(task)
             elif len(task) <= 5 and task.lower() in ['sentilink', 'cabp', 'ovationcxm']:
-                # Handle project names that might be standalone
                 cleaned_tasks.append(f"Create user stories for {task}")
         
         # Remove duplicates while preserving order
@@ -166,15 +254,358 @@ class TaskProcessor:
         
         return unique_tasks
     
+    def _is_comma_separator(self, text: str) -> bool:
+        """Determine if commas in text separate distinct tasks vs being part of a single task."""
+        # Split by commas and analyze the parts
+        parts = [part.strip() for part in text.split(',') if part.strip()]
+        
+        # If less than 2 parts, it's not a separator
+        if len(parts) < 2:
+            return False
+        
+        # Check if parts look like distinct tasks
+        for part in parts:
+            # If a part contains action verbs or task-like patterns, likely separate tasks
+            task_indicators = [
+                r'\b(pay|renew|buy|get|call|send|review|fix|update|write|create|schedule|finish|complete|submit|deploy)\b',
+                r'\b(bill|cert|gift|bug|meeting|report|appointment)\b',
+                r'\b(today|tomorrow|this week|next week|monday|tuesday|wednesday|thursday|friday)\b'
+            ]
+            
+            # If each part has task-like indicators, treat commas as separators
+            has_task_indicator = any(re.search(pattern, part.lower()) for pattern in task_indicators)
+            if has_task_indicator:
+                continue
+            else:
+                # If a part doesn't look like a task, might be part of a single description
+                # But if it's a short phrase, it might still be a task
+                if len(part.split()) >= 2:  # At least 2 words makes it more likely to be a task
+                    continue
+                else:
+                    return False
+        
+        # Additional check: if parts are very short, might not be separate tasks
+        avg_length = sum(len(part.split()) for part in parts) / len(parts)
+        if avg_length < 2:  # Very short parts
+            return False
+        
+        return True
+    
+    def classify_priority(self, task: str) -> str:
+        """Classify task priority using AI."""
+        try:
+            if self.client or self.model:
+                return self._classify_priority_with_ai(task)
+            else:
+                return self._classify_priority_fallback(task)
+        except Exception as e:
+            print(f"❌ AI priority classification failed: {e}")
+            return self._classify_priority_fallback(task)
+    
+    def _classify_priority_with_ai(self, task: str) -> str:
+        """Classify priority using AI API."""
+        prompt = f"""
+Classify the priority of this task as one of: "Highest", "High", "Medium", "Low"
+
+Priority levels:
+- Highest: Critical, blocking, urgent, "most important", immediate deadlines
+- High: Important, deadlines, urgent, time-sensitive
+- Medium: Important but not urgent, should be done soon
+- Low: Nice to have, optional, can wait
+
+Task: "{task}"
+
+Return only the priority level (Highest/High/Medium/Low):
+"""
+        
+        try:
+            if self.ai_provider == "chatgpt":
+                response = self.client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {"role": "system", "content": "You are a priority classification expert. Return only the priority level."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.1,
+                    max_tokens=10
+                )
+                result = response.choices[0].message.content.strip()
+                
+            elif self.ai_provider == "gemini":
+                response = self.model.generate_content(prompt)
+                result = response.text.strip()
+            
+            # Validate the result
+            valid_priorities = ["Highest", "High", "Medium", "Low"]
+            if result in valid_priorities:
+                return result
+            else:
+                raise ValueError(f"Invalid priority: {result}")
+                
+        except Exception as e:
+            print(f"❌ AI priority classification failed: {e}")
+            return self._classify_priority_fallback(task)
+    
+    def _classify_priority_fallback(self, task: str) -> str:
+        """Fallback priority classification using rule-based approach."""
+        task_lower = task.lower()
+        
+        # Check for highest priority indicators
+        if any(keyword in task_lower for keyword in ['most important', 'highest priority', 'critical', 'blocker', 'urgent', 'asap']):
+            return 'Highest'
+        
+        # Check for high priority indicators
+        if any(keyword in task_lower for keyword in ['deadline', 'today', 'tomorrow', 'eod', 'end of day', 'immediately', 'now']):
+            return 'High'
+        
+        # Check for medium priority indicators
+        if any(keyword in task_lower for keyword in ['soon', 'this week', 'should', 'need to']):
+            return 'Medium'
+        
+        # Default to low priority
+        return 'Low'
+    
+    def classify_category(self, task: str) -> str:
+        """Classify task category using AI."""
+        try:
+            if self.client or self.model:
+                return self._classify_category_with_ai(task)
+            else:
+                return self._classify_category_fallback(task)
+        except Exception as e:
+            print(f"❌ AI category classification failed: {e}")
+            return self._classify_category_fallback(task)
+    
+    def _classify_category_with_ai(self, task: str) -> str:
+        """Classify category using AI API."""
+        prompt = f"""
+Classify this task into one of these categories: "Work", "Meetings", "Personal", "Admin"
+
+Categories:
+- Work: Professional tasks, projects, reports, technical work, client work
+- Meetings: Scheduling meetings, calls, conferences, appointments
+- Personal: Personal life tasks, family, shopping, bills, health, travel
+- Admin: Administrative tasks, paperwork, forms, HR, expenses
+
+Task: "{task}"
+
+Return only the category name (Work/Meetings/Personal/Admin):
+"""
+        
+        try:
+            if self.ai_provider == "chatgpt":
+                response = self.client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {"role": "system", "content": "You are a category classification expert. Return only the category name."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.1,
+                    max_tokens=10
+                )
+                result = response.choices[0].message.content.strip()
+                
+            elif self.ai_provider == "gemini":
+                response = self.model.generate_content(prompt)
+                result = response.text.strip()
+            
+            # Validate the result
+            valid_categories = ["Work", "Meetings", "Personal", "Admin"]
+            if result in valid_categories:
+                return result
+            else:
+                raise ValueError(f"Invalid category: {result}")
+                
+        except Exception as e:
+            print(f"❌ AI category classification failed: {e}")
+            return self._classify_category_fallback(task)
+    
+    def _classify_category_fallback(self, task: str) -> str:
+        """Fallback category classification using rule-based approach."""
+        task_lower = task.lower()
+        
+        # Count keyword matches for each category
+        category_scores = {}
+        for category, keywords in self.category_keywords.items():
+            score = sum(1 for keyword in keywords if keyword in task_lower)
+            category_scores[category] = score
+        
+        # Special handling for meeting-related tasks
+        meeting_indicators = ['meeting', 'setup meeting', 'schedule meeting', 'meet', 'invite', 'appointment', 'call', 'conference', 'standup', 'retro', '1:1']
+        if any(indicator in task_lower for indicator in meeting_indicators):
+            category_scores['meetings'] = category_scores.get('meetings', 0) + 3
+        
+        # Special handling for personal tasks
+        personal_indicators = ['mom', 'dad', 'family', 'birthday', 'bday', 'gift', 'personal', 'home', 'shopping', 'grocery', 'doctor', 'internet', 'bill', 'electricity', 'recharge', 'payment']
+        if any(indicator in task_lower for indicator in personal_indicators):
+            category_scores['personal'] = category_scores.get('personal', 0) + 2
+        
+        # Return category with highest score, default to 'work'
+        if category_scores:
+            best_category = max(category_scores, key=category_scores.get)
+            if category_scores[best_category] > 0:
+                return best_category.title()
+        
+        return 'Work'
+    
+    def extract_due_date(self, task: str) -> Optional[str]:
+        """Extract due date from task description using AI and rule-based patterns."""
+        try:
+            if self.client or self.model:
+                return self._extract_due_date_with_ai(task)
+            else:
+                return self._extract_due_date_fallback(task)
+        except Exception as e:
+            print(f"❌ AI due date extraction failed: {e}")
+            return self._extract_due_date_fallback(task)
+    
+    def _extract_due_date_with_ai(self, task: str) -> Optional[str]:
+        """Extract due date using AI API."""
+        today = datetime.now().strftime("%Y-%m-%d")
+        prompt = f"""
+Extract the due date from this task description and return it in YYYY-MM-DD format.
+
+Today's date is: {today}
+
+Rules:
+- "today" = {today}
+- "tomorrow" = {(datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")}
+- "this week" = end of current week (Friday)
+- "next week" = end of next week (Friday)
+- "monday", "tuesday", etc. = next occurrence of that day
+- "by EOD" or "end of day" = today
+- If no specific date mentioned, return "null"
+
+Task: "{task}"
+
+Return only the date in YYYY-MM-DD format or "null":
+"""
+        
+        try:
+            if self.ai_provider == "chatgpt":
+                response = self.client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {"role": "system", "content": "You are a date extraction expert. Return only dates in YYYY-MM-DD format or 'null'."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.1,
+                    max_tokens=20
+                )
+                result = response.choices[0].message.content.strip()
+                
+            elif self.ai_provider == "gemini":
+                response = self.model.generate_content(prompt)
+                result = response.text.strip()
+            
+            # Validate the result
+            if result == "null" or result == "None":
+                return None
+            
+            # Try to parse the date
+            try:
+                datetime.strptime(result, "%Y-%m-%d")
+                return result
+            except ValueError:
+                raise ValueError(f"Invalid date format: {result}")
+                
+        except Exception as e:
+            print(f"❌ AI date extraction failed: {e}")
+            return self._extract_due_date_fallback(task)
+    
+    def _extract_due_date_fallback(self, task: str) -> Optional[str]:
+        """Extract due date using rule-based patterns."""
+        task_lower = task.lower()
+        today = datetime.now()
+        
+        # Today patterns
+        today_patterns = ['today', 'eod', 'end of day', 'by today', 'due today']
+        if any(pattern in task_lower for pattern in today_patterns):
+            return today.strftime("%Y-%m-%d")
+        
+        # Tomorrow patterns
+        tomorrow_patterns = ['tomorrow', 'tmw', 'by tomorrow', 'due tomorrow']
+        if any(pattern in task_lower for pattern in tomorrow_patterns):
+            return (today + timedelta(days=1)).strftime("%Y-%m-%d")
+        
+        # This week patterns
+        this_week_patterns = ['this week', 'by end of week', 'this friday']
+        if any(pattern in task_lower for pattern in this_week_patterns):
+            days_until_friday = (4 - today.weekday()) % 7
+            if days_until_friday == 0 and today.weekday() == 4:  # It's Friday
+                days_until_friday = 7
+            return (today + timedelta(days=days_until_friday)).strftime("%Y-%m-%d")
+        
+        # Next week patterns
+        next_week_patterns = ['next week', 'next friday']
+        if any(pattern in task_lower for pattern in next_week_patterns):
+            days_until_next_friday = (4 - today.weekday()) % 7 + 7
+            return (today + timedelta(days=days_until_next_friday)).strftime("%Y-%m-%d")
+        
+        # Specific weekday patterns (including abbreviations)
+        weekdays = {
+            # Full names
+            'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3, 
+            'friday': 4, 'saturday': 5, 'sunday': 6,
+            # Common abbreviations
+            'mon': 0, 'tue': 1, 'tues': 1, 'wed': 2, 'thu': 3, 'thur': 3, 'thurs': 3,
+            'fri': 4, 'sat': 5, 'sun': 6
+        }
+        
+        for day_name, day_num in weekdays.items():
+            # Use word boundary regex to avoid partial matches
+            if re.search(r'\b' + re.escape(day_name) + r'\b', task_lower):
+                days_ahead = (day_num - today.weekday()) % 7
+                if days_ahead == 0:  # Same day of week
+                    days_ahead = 7  # Next week
+                return (today + timedelta(days=days_ahead)).strftime("%Y-%m-%d")
+        
+        # Look for date patterns like "Jan 15", "15/1", "2024-01-15", etc.
+        # Simple date regex patterns
+        date_patterns = [
+            r'(\d{4}-\d{2}-\d{2})',  # YYYY-MM-DD
+            r'(\d{1,2}[/-]\d{1,2}[/-]\d{4})',  # MM/DD/YYYY or DD/MM/YYYY
+            r'(\d{1,2}[/-]\d{1,2})',  # MM/DD or DD/MM (current year)
+        ]
+        
+        for pattern in date_patterns:
+            match = re.search(pattern, task)
+            if match:
+                date_str = match.group(1)
+                try:
+                    # Try different date formats
+                    for fmt in ['%Y-%m-%d', '%m/%d/%Y', '%d/%m/%Y', '%m/%d', '%d/%m']:
+                        try:
+                            parsed_date = datetime.strptime(date_str, fmt)
+                            if fmt in ['%m/%d', '%d/%m']:  # Add current year
+                                parsed_date = parsed_date.replace(year=today.year)
+                            return parsed_date.strftime("%Y-%m-%d")
+                        except ValueError:
+                            continue
+                except:
+                    continue
+        
+        return None
+    
     def _clean_input_text(self, raw_text: str) -> str:
         """Clean input text by removing email headers and formatting."""
         # Remove email subject lines
         text = re.sub(r'^Subject:\s*.*?\n', '', raw_text, flags=re.IGNORECASE)
         # Remove signature lines (starting with – or -)
         text = re.sub(r'\n\s*[–-]\s*.*$', '', text)
-        # Remove extra whitespace
-        text = re.sub(r'\s+', ' ', text).strip()
-        return text
+        # Remove extra whitespace but preserve line breaks
+        # First normalize line breaks and remove empty lines
+        text = re.sub(r'\n\s*\n', '\n', text)  # Remove empty lines
+        # Then clean up spaces within lines while preserving line breaks
+        lines = text.split('\n')
+        cleaned_lines = []
+        for line in lines:
+            # Clean up extra spaces within each line
+            cleaned_line = re.sub(r'\s+', ' ', line).strip()
+            if cleaned_line:  # Only keep non-empty lines
+                cleaned_lines.append(cleaned_line)
+        
+        return '\n'.join(cleaned_lines)
     
     def _extract_email_tasks(self, text: str) -> List[str]:
         """Extract tasks from email-style messages."""
@@ -243,61 +674,12 @@ class TaskProcessor:
             else:
                 return [f"Pay bill ₹{amount1}", f"Pay bill ₹{amount2}"]
         
-        # Handle "pay X and Y rupees respectively" pattern
-        bill_pattern2 = r'pay\s+(\d+)\s+and\s+(\d+)\s+rupees?\s+respectively'
-        match = re.search(bill_pattern2, task_lower)
-        if match:
-            amount1 = match.group(1).strip()
-            amount2 = match.group(2).strip()
-            # Extract context for bills
-            context = task_lower.replace(match.group(0), '').strip()
-            if 'electricity' in context and 'internet' in context:
-                return [f"Pay electricity bill ₹{amount1}", f"Pay internet bill ₹{amount2}"]
-            elif 'electricity' in context:
-                return [f"Pay electricity bill ₹{amount1}", f"Pay bill ₹{amount2}"]
-            elif 'internet' in context:
-                return [f"Pay internet bill ₹{amount1}", f"Pay bill ₹{amount2}"]
-            else:
-                return [f"Pay bill ₹{amount1}", f"Pay bill ₹{amount2}"]
-        
-        # Handle bill amount patterns (e.g., "Bill amount 1500, 2300 respectively")
-        bill_pattern3 = r'bill\s+amount\s+(\d+(?:,\s*\d+)*)\s*(?:respectively|each|for|and)?'
-        match = re.search(bill_pattern3, task_lower)
-        if match:
-            amounts = re.findall(r'\d+', match.group(1))
-            if len(amounts) >= 2:
-                # Extract context for bills
-                context = task_lower.replace(match.group(0), '').strip()
-                if 'electricity' in context or 'power' in context:
-                    return [f"Pay electricity bill ₹{amounts[1]}", f"Pay internet bill ₹{amounts[0]}"]
-                elif 'internet' in context:
-                    return [f"Pay internet bill ₹{amounts[0]}", f"Pay electricity bill ₹{amounts[1]}"]
-                else:
-                    return [f"Pay bill ₹{amounts[0]}", f"Pay bill ₹{amounts[1]}"]
-        
-        # Handle specific patterns with deadlines and multiple actions
-        # Pattern: "X deadline is today 5pm, Y"
-        deadline_split_pattern = r'(.+?)\s+deadline\s+is\s+(.+?),\s+(.+)'
-        match = re.search(deadline_split_pattern, task_lower)
-        if match:
-            part1 = f"{match.group(1).strip()} deadline is {match.group(2).strip()}"
-            part2 = match.group(3).strip()
-            return [part1, part2]
-        
         # Pattern: "X, before that Y" (dependency pattern)
         before_pattern = r'(.+?),\s+before\s+that\s+(.+)'
         match = re.search(before_pattern, task_lower)
         if match:
             part1 = f"{match.group(2).strip()}"  # Do the prerequisite first
             part2 = f"{match.group(1).strip()}"  # Then do the main task
-            return [part1, part2]
-        
-        # Pattern: "X as well as Y" (parallel tasks)
-        as_well_as_pattern = r'(.+?)\s+as\s+well\s+as\s+(.+)'
-        match = re.search(as_well_as_pattern, task_lower)
-        if match:
-            part1 = f"{match.group(1).strip()}"
-            part2 = f"{match.group(2).strip()}"
             return [part1, part2]
         
         # Pattern: "Work on creating X for Y project as well as for Z" (project-specific)
@@ -318,7 +700,7 @@ class TaskProcessor:
             project2 = match.group(3).strip()
             return [f"Create {action} for {project1}", f"Create {action} for {project2}"]
         
-        # Pattern: "X as well as Y" (parallel tasks) - improved
+        # Pattern: "X as well as Y" (parallel tasks)
         as_well_as_pattern = r'(.+?)\s+as\s+well\s+as\s+(.+)'
         match = re.search(as_well_as_pattern, task_lower)
         if match:
@@ -345,47 +727,6 @@ class TaskProcessor:
         if match:
             main_action = match.group(1).strip()
             return [f"{main_action} and check on their progress"]
-        
-        # Pattern: "X so need to Y, Z"
-        so_need_pattern = r'(.+?)\s+so\s+need\s+to\s+(.+?),\s+(.+)'
-        match = re.search(so_need_pattern, task_lower)
-        if match:
-            part1 = f"{match.group(1).strip()}"
-            part2 = f"Need to {match.group(2).strip()}"
-            part3 = match.group(3).strip()
-            return [part1, part2, part3]
-        
-        # Pattern: "X, Y is due Z"
-        due_pattern = r'(.+?),\s+(.+?)\s+is\s+due\s+(.+)'
-        match = re.search(due_pattern, task_lower)
-        if match:
-            part1 = match.group(1).strip()
-            part2 = f"{match.group(2).strip()} is due {match.group(3).strip()}"
-            return [part1, part2]
-        
-        # Pattern: "X, Y otherwise Z"
-        otherwise_pattern = r'(.+?),\s+(.+?)\s+otherwise\s+(.+)'
-        match = re.search(otherwise_pattern, task_lower)
-        if match:
-            part1 = match.group(1).strip()
-            part2 = f"{match.group(2).strip()} otherwise {match.group(3).strip()}"
-            return [part1, part2]
-        
-        # Handle specific email patterns
-        restart_and_share_pattern = r'(.+?)\s+and\s+share\s+(.+?)(?:\s+by|\s+by\s+tomorrow|\s+by\s+\d+|\s+by\s+\w+|\s+by\s+\w+\s+\d+|\s+by\s+\d+\s+\w+)'
-        match = re.search(restart_and_share_pattern, task_lower)
-        if match:
-            part1 = match.group(1).strip()
-            part2 = f"share {match.group(2).strip()}"
-            return [part1, part2]
-        
-        # Pattern: "X and Y by deadline"
-        and_by_pattern = r'(.+?)\s+and\s+(.+?)(?:\s+by|\s+by\s+tomorrow|\s+by\s+\d+|\s+by\s+\w+|\s+by\s+\w+\s+\d+|\s+by\s+\d+\s+\w+)'
-        match = re.search(and_by_pattern, task_lower)
-        if match:
-            part1 = match.group(1).strip()
-            part2 = match.group(2).strip()
-            return [part1, part2]
         
         # Common compound task indicators
         compound_indicators = [
@@ -436,268 +777,18 @@ class TaskProcessor:
         
         return filtered_parts if len(filtered_parts) > 1 else [task]
     
-    def classify_priority(self, task: str) -> str:
-        """Comprehensive priority classification using multi-factor scoring algorithm."""
-        priority_score = self._calculate_priority_score(task)
-        return self._score_to_priority(priority_score)
-    
-    def _calculate_priority_score(self, task: str) -> Dict[str, Any]:
-        """Calculate comprehensive priority score using multiple factors."""
-        task_lower = task.lower()
-        
-        # Initialize scoring components
-        score_components = {
-            'urgency_keywords': 0,
-            'time_sensitivity': 0,
-            'security_impact': 0,
-            'business_impact': 0,
-            'deadline_pressure': 0,
-            'context_urgency': 0,
-            'negative_indicators': 0,
-            'positive_indicators': 0
-        }
-        
-        # 1. URGENCY KEYWORDS SCORING (0-60 points)
-        urgency_patterns = {
-            'most important': 60, 'highest priority': 60, 'critical': 40, 'urgent': 35, 'emergency': 40, 'asap': 30,
-            'immediately': 25, 'now': 20, 'right now': 30,
-            'blocker': 35, 'blocking': 30, 'stopping': 25,
-            'broken': 20, 'down': 25, 'failing': 20, 'error': 15,
-            'time-sensitive': 25, 'time critical': 30,
-            'otherwise': 20, 'no internet': 25, 'no power': 25,
-            'from tomorrow': 20, 'due': 15, 'expiring': 20,
-            'not received': 30, 'missing': 25, 'issue': 20
-        }
-        
-        for pattern, score in urgency_patterns.items():
-            if pattern in task_lower:
-                score_components['urgency_keywords'] = max(score_components['urgency_keywords'], score)
-        
-        # 2. TIME SENSITIVITY SCORING (0-35 points)
-        time_patterns = {
-            'today': 25, 'tomorrow': 20, 'tmw': 20, 'this week': 15,
-            'by eod': 30, 'by end of day': 30, 'by close': 25,
-            'deadline': 25, 'due': 20, 'expiring': 20, 'expire': 20,
-            'by tomorrow': 25, 'by friday': 15, 'by monday': 10
-        }
-        
-        # Time with specific hours (higher priority)
-        time_hour_patterns = [
-            r'by \d+am', r'by \d+pm', r'at \d+am', r'at \d+pm',
-            r'\d+am', r'\d+pm', r'\d+:\d+am', r'\d+:\d+pm'
-        ]
-        
-        for pattern in time_hour_patterns:
-            if re.search(pattern, task_lower):
-                score_components['time_sensitivity'] = max(score_components['time_sensitivity'], 30)
-        
-        for pattern, score in time_patterns.items():
-            if pattern in task_lower:
-                score_components['time_sensitivity'] = max(score_components['time_sensitivity'], score)
-        
-        # 3. SECURITY IMPACT SCORING (0-40 points)
-        security_patterns = {
-            'security': 25, 'api key': 30, 'rotate': 25, 'credentials': 20,
-            'password': 20, 'auth': 15, 'token': 20, 'access': 15,
-            'permission': 15, 'role': 15, 'flagged': 30, 'suspicious': 25,
-            'breach': 40, 'compromise': 35, 'vulnerability': 30,
-            'patch': 20, 'update security': 25, 'fix security': 25
-        }
-        
-        for pattern, score in security_patterns.items():
-            if pattern in task_lower:
-                score_components['security_impact'] = max(score_components['security_impact'], score)
-        
-        # 4. BUSINESS IMPACT SCORING (0-35 points)
-        business_patterns = {
-            'client': 20, 'customer': 20, 'revenue': 25, 'sales': 20,
-            'production': 25, 'live': 20, 'deploy': 20, 'release': 15,
-            'launch': 20, 'go-live': 25, 'critical path': 30,
-            'dependency': 15, 'blocking': 20, 'stopping': 20,
-            'outage': 30, 'downtime': 25, 'service down': 30,
-            'performance': 15, 'slow': 10, 'optimize': 10,
-            'fix': 15, 'bug': 15, 'issue': 15, 'problem': 15,
-            'portal': 20, 'system': 15, 'platform': 15,
-            'users': 15, 'user': 15, 'affecting': 20,
-            'loss': 20, 'causing': 15, 'impact': 15,
-            'internet': 15, 'electricity': 15, 'power': 15,
-            'recharge': 15, 'payment': 10, 'bill': 10,
-            'user stories': 20, 'project': 15, 'progress': 15
-        }
-        
-        for pattern, score in business_patterns.items():
-            if pattern in task_lower:
-                score_components['business_impact'] = max(score_components['business_impact'], score)
-        
-        # 5. DEADLINE PRESSURE SCORING (0-25 points)
-        deadline_patterns = {
-            'deadline': 20, 'due date': 20, 'must be done': 15,
-            'required by': 15, 'needed by': 10, 'expected by': 10,
-            'promised': 15, 'committed': 15, 'scheduled': 10,
-            'by today': 20, 'by tomorrow': 15, 'by eod': 20,
-            'submit': 15, 'deliver': 15, 'complete': 10,
-            'finish': 10, 'prepare': 10, 'review': 10
-        }
-        
-        for pattern, score in deadline_patterns.items():
-            if pattern in task_lower:
-                score_components['deadline_pressure'] = max(score_components['deadline_pressure'], score)
-        
-        # 6. CONTEXT URGENCY SCORING (0-30 points)
-        context_patterns = {
-            'meeting': 15, 'presentation': 20, 'demo': 20, 'review': 15,
-            'approval': 20, 'sign-off': 20, 'decision': 20,
-            'escalate': 25, 'escalated': 25, 'manager': 15, 'boss': 15,
-            'ceo': 25, 'director': 20, 'vp': 20,
-            'performance review': 20, 'feedback': 20, 'invite': 15,
-            'praveen': 15, 'av': 15  # Specific people mentioned
-        }
-        
-        for pattern, score in context_patterns.items():
-            if pattern in task_lower:
-                score_components['context_urgency'] = max(score_components['context_urgency'], score)
-        
-        # 7. NEGATIVE INDICATORS (reduce priority)
-        negative_patterns = [
-            'nice to have', 'nice-to-have', 'optional', 'eventually',
-            'sometime', 'when possible', 'if time', 'low priority',
-            'backlog', 'future', 'later', 'not urgent'
-        ]
-        
-        for pattern in negative_patterns:
-            if pattern in task_lower:
-                score_components['negative_indicators'] = -15
-                break
-        
-        # 8. POSITIVE INDICATORS (boost priority)
-        positive_patterns = [
-            'important', 'critical', 'must', 'need to', 'should',
-            'priority', 'high priority', 'top priority'
-        ]
-        
-        for pattern in positive_patterns:
-            if pattern in task_lower:
-                score_components['positive_indicators'] = 10
-                break
-        
-        # Calculate total score
-        total_score = sum(score_components.values())
-        
-        return {
-            'total_score': total_score,
-            'components': score_components,
-            'task': task
-        }
-    
-    def _score_to_priority(self, score_data: Dict[str, Any]) -> str:
-        """Convert priority score to priority level."""
-        total_score = score_data['total_score']
-        
-        # Enhanced thresholds with Highest priority
-        if total_score >= 80:  # Highest priority for critical tasks
-            return 'Highest'
-        elif total_score >= 50:  # High priority
-            return 'High'
-        elif total_score >= 20:  # Medium priority
-            return 'Medium'
-        else:
-            return 'Low'
-
-    def classify_category(self, task: str) -> str:
-        """Classify task category using keyword matching."""
-        task_lower = task.lower()
-        
-        # Count keyword matches for each category
-        category_scores = {}
-        for category, keywords in self.category_keywords.items():
-            score = sum(1 for keyword in keywords if keyword in task_lower)
-            category_scores[category] = score
-        
-        # Special handling for meeting-related tasks
-        meeting_indicators = ['meeting', 'setup meeting', 'schedule meeting', 'meet', 'invite', 'appointment', 'call', 'conference', 'standup', 'retro', '1:1']
-        if any(indicator in task_lower for indicator in meeting_indicators):
-            category_scores['meetings'] = category_scores.get('meetings', 0) + 3  # Strong boost for meetings
-        
-        # Special handling for work-related tasks
-        work_indicators = ['appraisal', 'form', 'deadline', 'team', 'project', 'client', 'presentation', 'report', 'review']
-        if any(indicator in task_lower for indicator in work_indicators):
-            category_scores['work'] = category_scores.get('work', 0) + 2  # Boost work score
-        
-        # Special handling for personal tasks
-        personal_indicators = ['mom', 'dad', 'family', 'birthday', 'bday', 'gift', 'personal', 'home', 'shopping', 'grocery', 'doctor', 'internet', 'bill', 'electricity', 'recharge', 'payment']
-        if any(indicator in task_lower for indicator in personal_indicators):
-            category_scores['personal'] = category_scores.get('personal', 0) + 2  # Boost personal score
-        
-        # Special handling for admin tasks
-        admin_indicators = ['form', 'paperwork', 'billing', 'invoice', 'expense', 'hr', 'admin', 'travel', 'reimbursement', 'hiring']
-        if any(indicator in task_lower for indicator in admin_indicators):
-            category_scores['admin'] = category_scores.get('admin', 0) + 2  # Boost admin score
-        
-        # Return category with highest score, default to 'work'
-        if category_scores:
-            best_category = max(category_scores, key=category_scores.get)
-            if category_scores[best_category] > 0:
-                return best_category.title()
-        
-        return 'Work'  # Default category
-    
     def get_priority_analysis(self, task: str) -> Dict[str, Any]:
         """Get detailed priority analysis for a task."""
-        score_data = self._calculate_priority_score(task)
-        priority = self._score_to_priority(score_data)
+        priority = self.classify_priority(task)
+        category = self.classify_category(task)
         
         return {
             'task': task,
             'priority': priority,
-            'total_score': score_data['total_score'],
-            'score_breakdown': score_data['components'],
-            'confidence': self._calculate_confidence(score_data),
-            'reasoning': self._generate_reasoning(score_data)
+            'category': category,
+            'confidence': 'high' if self.client or self.model else 'medium',
+            'reasoning': f"AI-powered analysis using {self.ai_provider}" if self.client or self.model else "Rule-based analysis"
         }
-    
-    def _calculate_confidence(self, score_data: Dict[str, Any]) -> str:
-        """Calculate confidence level for priority classification."""
-        total_score = score_data['total_score']
-        components = score_data['components']
-        
-        # Count non-zero components
-        active_components = sum(1 for score in components.values() if score != 0)
-        
-        if total_score >= 60 and active_components >= 2:
-            return 'High'
-        elif total_score >= 25 and active_components >= 1:
-            return 'Medium'
-        else:
-            return 'Low'
-    
-    def _generate_reasoning(self, score_data: Dict[str, Any]) -> List[str]:
-        """Generate human-readable reasoning for priority classification."""
-        reasoning = []
-        components = score_data['components']
-        
-        # Find the top contributing factors
-        sorted_components = sorted(components.items(), key=lambda x: x[1], reverse=True)
-        
-        for component, score in sorted_components:
-            if score > 0:
-                if component == 'urgency_keywords':
-                    reasoning.append(f"Contains urgent keywords (+{score} points)")
-                elif component == 'time_sensitivity':
-                    reasoning.append(f"Time-sensitive task (+{score} points)")
-                elif component == 'security_impact':
-                    reasoning.append(f"Security-related (+{score} points)")
-                elif component == 'business_impact':
-                    reasoning.append(f"High business impact (+{score} points)")
-                elif component == 'deadline_pressure':
-                    reasoning.append(f"Deadline pressure (+{score} points)")
-                elif component == 'context_urgency':
-                    reasoning.append(f"Context urgency (+{score} points)")
-                elif component == 'positive_indicators':
-                    reasoning.append(f"Positive priority indicators (+{score} points)")
-            elif score < 0:
-                reasoning.append(f"Low priority indicators ({score} points)")
-        
-        return reasoning[:3]  # Return top 3 reasons
     
     def process_tasks(self, raw_text: str) -> Dict[str, Any]:
         """Main method to process raw text and return structured tasks."""
@@ -720,13 +811,14 @@ class TaskProcessor:
                     'description': task,
                     'priority': self.classify_priority(task),
                     'category': self.classify_category(task),
+                    'due_date': self.extract_due_date(task),
                     'status': 'pending'
                 }
                 processed_tasks.append(processed_task)
             
             return {
                 'success': True,
-                'message': f'Successfully processed {len(processed_tasks)} tasks',
+                'message': f'Successfully processed {len(processed_tasks)} tasks using {self.ai_provider}',
                 'tasks': processed_tasks
             }
             
@@ -740,7 +832,7 @@ class TaskProcessor:
 
 # Example usage and testing
 if __name__ == "__main__":
-    processor = TaskProcessor()
+    processor = TaskProcessor(ai_provider="chatgpt")
     
     # Test with sample input
     sample_text = """

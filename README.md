@@ -1,14 +1,15 @@
 # AI To-Do List Manager
-## Hugging Face + Local Processing Implementation
+## ChatGPT & Gemini API Integration
 
 ### 🎯 Overview
-An AI-powered tool that automatically organizes raw task notes into structured to-do lists with priorities and categories. Everything runs locally using Hugging Face models - no external API calls required!
+An AI-powered tool that automatically organizes raw task notes into structured to-do lists with priorities and categories. Uses advanced AI APIs (ChatGPT or Gemini) for intelligent task processing with fallback to rule-based processing.
 
 ### ✨ Features
-- ✅ **Local AI Processing** - No external API calls, complete data privacy
-- ✅ **Smart Task Extraction** - Automatically extracts tasks from raw text
-- ✅ **Priority Classification** - Assigns High/Medium/Low priorities
-- ✅ **Category Suggestion** - Groups tasks into Work/Admin/Meetings/Personal
+- ✅ **AI-Powered Processing** - Uses ChatGPT or Gemini APIs for intelligent task extraction
+- ✅ **Smart Task Extraction** - Automatically extracts tasks from raw text with context understanding
+- ✅ **Priority Classification** - Assigns Highest/High/Medium/Low priorities using AI
+- ✅ **Category Suggestion** - Groups tasks into Work/Admin/Meetings/Personal using AI
+- ✅ **Fallback Processing** - Rule-based processing when AI APIs are unavailable
 - ✅ **Clean Web Interface** - Modern, responsive React frontend
 - ✅ **Task Management** - Mark complete, edit, delete tasks
 - ✅ **Filtering & Search** - Filter by status, priority, category
@@ -41,6 +42,10 @@ ai-todo-manager/
 - **Python 3.8+** - [Download here](https://www.python.org/downloads/)
 - **Node.js 16+** - [Download here](https://nodejs.org/)
 - **Git** - [Download here](https://git-scm.com/)
+- **AI API Key** (Choose one):
+  - **OpenAI API Key** - [Get from OpenAI](https://platform.openai.com/api-keys) for ChatGPT
+  - **Google API Key** - [Get from Google AI](https://makersuite.google.com/app/apikey) for Gemini
+  - **No API Key** - System will use rule-based fallback processing
 
 #### Installation Steps
 
@@ -50,24 +55,54 @@ ai-todo-manager/
    cd ai-todo-manager
    ```
 
-2. **Install Python dependencies**
+2. **Set up AI API Keys** (Choose one option)
+   
+   **Option A: ChatGPT (OpenAI)**
+   ```bash
+   # Windows
+   set OPENAI_API_KEY=your_openai_api_key_here
+   set AI_PROVIDER=chatgpt
+   
+   # Linux/Mac
+   export OPENAI_API_KEY="your_openai_api_key_here"
+   export AI_PROVIDER="chatgpt"
+   ```
+   
+   **Option B: Gemini (Google)**
+   ```bash
+   # Windows
+   set GEMINI_API_KEY=your_gemini_api_key_here
+   set AI_PROVIDER=gemini
+   
+   # Linux/Mac
+   export GEMINI_API_KEY="your_gemini_api_key_here"
+   export AI_PROVIDER="gemini"
+   ```
+   
+   **Option C: No API Keys (Fallback Mode)**
+   ```bash
+   # The system will automatically use rule-based processing
+   set AI_PROVIDER=fallback
+   ```
+
+3. **Install Python dependencies**
    ```bash
    pip install -r requirements.txt
    ```
 
-3. **Install frontend dependencies**
+4. **Install frontend dependencies**
    ```bash
    cd frontend
    npm install
    cd ..
    ```
 
-4. **Test the AI processor**
+5. **Test the AI processor**
    ```bash
-   python test_ai_processor.py
+   python test_ai_integration.py
    ```
 
-5. **Start the backend server**
+6. **Start the backend server**
    ```bash
    # Windows
    start_backend.bat
@@ -81,13 +116,13 @@ ai-todo-manager/
    python app.py
    ```
 
-6. **Start the frontend** (in a new terminal)
+7. **Start the frontend** (in a new terminal)
    ```bash
    cd frontend
    npm start
    ```
 
-7. **Open your browser**
+8. **Open your browser**
    - Frontend: http://localhost:3000
    - Backend API: http://localhost:5000
 

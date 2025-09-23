@@ -25,7 +25,8 @@ function App() {
   const [filter, setFilter] = useState({
     status: 'all',
     priority: 'all',
-    category: 'all'
+    category: 'all',
+    due_date: 'all'
   });
 
   // Load tasks on component mount
@@ -39,6 +40,7 @@ function App() {
       if (filter.status !== 'all') params.append('status', filter.status);
       if (filter.priority !== 'all') params.append('priority', filter.priority);
       if (filter.category !== 'all') params.append('category', filter.category);
+      if (filter.due_date !== 'all') params.append('due_date', filter.due_date);
 
       const response = await axios.get(`${API_BASE_URL}/tasks?${params}`);
       if (response.data.success) {
@@ -168,6 +170,39 @@ function App() {
     }
   };
 
+  const formatDueDate = (dueDate) => {
+    if (!dueDate) return '';
+    
+    const today = new Date();
+    const due = new Date(dueDate);
+    const diffTime = due - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Tomorrow';
+    if (diffDays === -1) return 'Yesterday';
+    if (diffDays < -1) return `${Math.abs(diffDays)} days overdue`;
+    if (diffDays <= 7) return `In ${diffDays} days`;
+    
+    return due.toLocaleDateString();
+  };
+
+  const getDueDateColor = (dueDate) => {
+    if (!dueDate) return 'bg-gray-100 text-gray-800';
+    
+    const today = new Date();
+    const due = new Date(dueDate);
+    const diffTime = due - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 0) return 'bg-red-100 text-red-800 border border-red-200'; // Overdue
+    if (diffDays === 0) return 'bg-orange-100 text-orange-800 border border-orange-200'; // Today
+    if (diffDays === 1) return 'bg-yellow-100 text-yellow-800 border border-yellow-200'; // Tomorrow
+    if (diffDays <= 7) return 'bg-blue-100 text-blue-800 border border-blue-200'; // This week
+    
+    return 'bg-green-100 text-green-800 border border-green-200'; // Future
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -289,6 +324,77 @@ function App() {
                 <option value="Personal">Personal</option>
               </select>
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Due Date
+              </label>
+              <select
+                value={filter.due_date}
+                onChange={(e) => setFilter({...filter, due_date: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="all">All Dates</option>
+                <option value="today">Today</option>
+                <option value="tomorrow">Tomorrow</option>
+                <option value="this_week">This Week</option>
+                <option value="overdue">Overdue</option>
+                <option value="no_date">No Date Set</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Date Filters */}
+        <div className="bg-white rounded-lg shadow-sm border p-4 mb-6">
+          <h4 className="text-sm font-medium text-gray-700 mb-3">Quick Filters</h4>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setFilter({...filter, due_date: 'today'})}
+              className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                filter.due_date === 'today'
+                  ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                  : 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200'
+              }`}
+            >
+              📅 Today
+            </button>
+            <button
+              onClick={() => setFilter({...filter, due_date: 'tomorrow'})}
+              className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                filter.due_date === 'tomorrow'
+                  ? 'bg-green-100 text-green-700 border border-green-200'
+                  : 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200'
+              }`}
+            >
+              🌅 Tomorrow
+            </button>
+            <button
+              onClick={() => setFilter({...filter, due_date: 'this_week'})}
+              className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                filter.due_date === 'this_week'
+                  ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                  : 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200'
+              }`}
+            >
+              📆 This Week
+            </button>
+            <button
+              onClick={() => setFilter({...filter, due_date: 'overdue'})}
+              className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                filter.due_date === 'overdue'
+                  ? 'bg-red-100 text-red-700 border border-red-200'
+                  : 'bg-gray-100 text-gray-700 border border-gray-200 hover:bg-gray-200'
+              }`}
+            >
+              ⚠️ Overdue
+            </button>
+            <button
+              onClick={() => setFilter({status: 'all', priority: 'all', category: 'all', due_date: 'all'})}
+              className="px-3 py-2 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-200 rounded-md hover:bg-gray-200 transition-colors"
+            >
+              🔄 Clear Filters
+            </button>
           </div>
         </div>
 
@@ -359,6 +465,12 @@ function App() {
                             <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getCategoryColor(task.category)}`}>
                               {task.category}
                             </span>
+                            
+                            {task.due_date && (
+                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getDueDateColor(task.due_date)}`}>
+                                📅 {formatDueDate(task.due_date)}
+                              </span>
+                            )}
                             
                             <span className="text-xs text-gray-500">
                               {new Date(task.created_at).toLocaleDateString()}

@@ -14,8 +14,9 @@ import os
 app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend communication
 
-# Initialize AI processor
-task_processor = TaskProcessor()
+# Initialize AI processor with provider selection
+ai_provider = os.getenv('AI_PROVIDER', 'chatgpt')  # Default to ChatGPT
+task_processor = TaskProcessor(ai_provider=ai_provider)
 
 # Database setup
 DB_PATH = 'tasks.db'
@@ -32,10 +33,19 @@ def init_database():
             priority TEXT NOT NULL,
             category TEXT NOT NULL,
             status TEXT DEFAULT 'pending',
+            due_date DATE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    
+    # Add due_date column if it doesn't exist (for existing databases)
+    try:
+        cursor.execute('ALTER TABLE tasks ADD COLUMN due_date DATE')
+        conn.commit()
+    except sqlite3.OperationalError:
+        # Column already exists
+        pass
     
     conn.commit()
     conn.close()
@@ -87,9 +97,9 @@ def process_tasks():
             
             for task in result['tasks']:
                 cursor.execute('''
-                    INSERT INTO tasks (description, priority, category, status)
-                    VALUES (?, ?, ?, ?)
-                ''', (task['description'], task['priority'], task['category'], task['status']))
+                    INSERT INTO tasks (description, priority, category, status, due_date)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (task['description'], task['priority'], task['category'], task['status'], task.get('due_date')))
             
             conn.commit()
             conn.close()
@@ -116,6 +126,7 @@ def get_tasks():
         status = request.args.get('status', 'all')
         priority = request.args.get('priority', 'all')
         category = request.args.get('category', 'all')
+        due_date = request.args.get('due_date', 'all')  # 'today', 'tomorrow', 'this_week', 'overdue', 'all'
         
         # Build query
         query = 'SELECT * FROM tasks WHERE 1=1'
@@ -133,6 +144,31 @@ def get_tasks():
             query += ' AND category = ?'
             params.append(category)
         
+        # Handle date filtering
+        from datetime import datetime, timedelta
+        today = datetime.now().strftime("%Y-%m-%d")
+        
+        if due_date == 'today':
+            query += ' AND due_date = ?'
+            params.append(today)
+        elif due_date == 'tomorrow':
+            tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+            query += ' AND due_date = ?'
+            params.append(tomorrow)
+        elif due_date == 'this_week':
+            # Tasks due from today until end of week (Sunday)
+            days_until_sunday = (6 - datetime.now().weekday()) % 7
+            if days_until_sunday == 0:  # It's Sunday
+                days_until_sunday = 7
+            end_of_week = (datetime.now() + timedelta(days=days_until_sunday)).strftime("%Y-%m-%d")
+            query += ' AND due_date BETWEEN ? AND ?'
+            params.extend([today, end_of_week])
+        elif due_date == 'overdue':
+            query += ' AND due_date < ? AND status != "completed"'
+            params.append(today)
+        elif due_date == 'no_date':
+            query += ' AND due_date IS NULL'
+        
         query += ' ORDER BY created_at DESC'
         
         cursor.execute(query, params)
@@ -149,6 +185,7 @@ def get_tasks():
                 'priority': task['priority'],
                 'category': task['category'],
                 'status': task['status'],
+                'due_date': task['due_date'],
                 'created_at': task['created_at'],
                 'updated_at': task['updated_at']
             })
@@ -211,6 +248,10 @@ def update_task(task_id):
         if 'status' in data:
             update_fields.append('status = ?')
             params.append(data['status'])
+        
+        if 'due_date' in data:
+            update_fields.append('due_date = ?')
+            params.append(data['due_date'])
         
         if update_fields:
             update_fields.append('updated_at = CURRENT_TIMESTAMP')
@@ -377,6 +418,126 @@ def get_stats():
         return jsonify({
             'success': False,
             'message': f'Server error: {str(e)}'
+        }), 500
+
+@app.route('/api/tasks/today', methods=['GET'])
+def get_today_tasks():
+    """Get tasks due today."""
+    try:
+        from datetime import datetime
+        today = datetime.now().strftime("%Y-%m-%d")
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM tasks WHERE due_date = ? ORDER BY priority DESC, created_at ASC', (today,))
+        tasks = cursor.fetchall()
+        conn.close()
+        
+        task_list = []
+        for task in tasks:
+            task_list.append({
+                'id': task['id'],
+                'description': task['description'],
+                'priority': task['priority'],
+                'category': task['category'],
+                'status': task['status'],
+                'due_date': task['due_date'],
+                'created_at': task['created_at'],
+                'updated_at': task['updated_at']
+            })
+        
+        return jsonify({
+            'success': True,
+            'tasks': task_list,
+            'count': len(task_list),
+            'date': today
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Server error: {str(e)}',
+            'tasks': []
+        }), 500
+
+@app.route('/api/tasks/tomorrow', methods=['GET'])
+def get_tomorrow_tasks():
+    """Get tasks due tomorrow."""
+    try:
+        from datetime import datetime, timedelta
+        tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM tasks WHERE due_date = ? ORDER BY priority DESC, created_at ASC', (tomorrow,))
+        tasks = cursor.fetchall()
+        conn.close()
+        
+        task_list = []
+        for task in tasks:
+            task_list.append({
+                'id': task['id'],
+                'description': task['description'],
+                'priority': task['priority'],
+                'category': task['category'],
+                'status': task['status'],
+                'due_date': task['due_date'],
+                'created_at': task['created_at'],
+                'updated_at': task['updated_at']
+            })
+        
+        return jsonify({
+            'success': True,
+            'tasks': task_list,
+            'count': len(task_list),
+            'date': tomorrow
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Server error: {str(e)}',
+            'tasks': []
+        }), 500
+
+@app.route('/api/tasks/overdue', methods=['GET'])
+def get_overdue_tasks():
+    """Get overdue tasks."""
+    try:
+        from datetime import datetime
+        today = datetime.now().strftime("%Y-%m-%d")
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM tasks WHERE due_date < ? AND status != "completed" ORDER BY due_date ASC', (today,))
+        tasks = cursor.fetchall()
+        conn.close()
+        
+        task_list = []
+        for task in tasks:
+            task_list.append({
+                'id': task['id'],
+                'description': task['description'],
+                'priority': task['priority'],
+                'category': task['category'],
+                'status': task['status'],
+                'due_date': task['due_date'],
+                'created_at': task['created_at'],
+                'updated_at': task['updated_at']
+            })
+        
+        return jsonify({
+            'success': True,
+            'tasks': task_list,
+            'count': len(task_list),
+            'message': f'Found {len(task_list)} overdue tasks'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Server error: {str(e)}',
+            'tasks': []
         }), 500
 
 if __name__ == '__main__':
