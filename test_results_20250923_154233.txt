@@ -1,0 +1,346 @@
+[15:42:33] INFO: 🚀 AI TO-DO LIST MANAGER - COMPREHENSIVE TEST SUITE
+[15:42:33] INFO: 🕒 Started at: 2025-09-23 15:42:33
+[15:42:33] INFO: ================================================================================
+[15:42:33] INFO: 
+🔤 BASIC TASK EXTRACTION TESTS
+[15:42:33] INFO: 
+============================================================
+[15:42:33] INFO: 🧪 TEST: Simple semicolon separation
+[15:42:33] INFO: 📝 Input: 'fix bug; update docs; deploy app; test features'
+[15:42:33] INFO: ✅ SUCCESS: Extracted 3 tasks
+[15:42:33] INFO:    1. Fix bug
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    2. Deploy app
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    3. Test features
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO: ❌ Task count validation FAILED (expected: 4, got: 3)
+[15:42:33] INFO: 
+============================================================
+[15:42:33] INFO: 🧪 TEST: Line break separation
+[15:42:33] INFO: 📝 Input: 'Update project README\nSchedule team standup\nReview pull requests\nFix mobile issues'
+[15:42:33] INFO: ✅ SUCCESS: Extracted 4 tasks
+[15:42:33] INFO:    1. Project readme
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    2. Schedule team standup
+[15:42:33] INFO:       Priority: Low | Category: Meetings
+[15:42:33] INFO:    3. Pull requests
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    4. Fix mobile issues
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO: ✅ Task count validation PASSED (expected: 4)
+[15:42:33] INFO: 
+============================================================
+[15:42:33] INFO: 🧪 TEST: Mixed separators
+[15:42:33] INFO: 📝 Input: 'pay internet bill today\nrenew SSL cert; mom bday gift, call dentist; fix navbar bug'
+[15:42:33] INFO: ✅ SUCCESS: Extracted 5 tasks
+[15:42:33] INFO:    1. Pay internet bill today
+[15:42:33] INFO:       Priority: High | Category: Personal | Due: 2025-09-23
+[15:42:33] INFO:    2. Renew ssl cert
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    3. Mom bday gift
+[15:42:33] INFO:       Priority: Low | Category: Personal
+[15:42:33] INFO:    4. Dentist
+[15:42:33] INFO:       Priority: Low | Category: Personal
+[15:42:33] INFO:    5. Fix navbar bug
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO: ✅ Task count validation PASSED (expected: 5)
+[15:42:33] INFO: 
+⚡ PRIORITY CLASSIFICATION TESTS
+[15:42:33] INFO: 
+============================================================
+[15:42:33] INFO: 🧪 TEST: Highest priority keywords
+[15:42:33] INFO: 📝 Input: 'Most important: fix critical security vulnerability ASAP'
+[15:42:33] INFO: ✅ SUCCESS: Extracted 1 tasks
+[15:42:33] INFO:    1. Most important: fix critical security vulnerability asap
+[15:42:33] INFO:       Priority: Highest | Category: Work
+[15:42:33] INFO: ✅ Task count validation PASSED (expected: 1)
+[15:42:33] INFO: ✅ Priority validation PASSED
+[15:42:33] INFO: 
+============================================================
+[15:42:33] INFO: 🧪 TEST: High priority with deadlines
+[15:42:33] INFO: 📝 Input: 'Submit report by EOD today; deploy hotfix by tomorrow'
+[15:42:33] INFO: ✅ SUCCESS: Extracted 2 tasks
+[15:42:33] INFO:    1. Submit report by eod today
+[15:42:33] INFO:       Priority: High | Category: Work | Due: 2025-09-23
+[15:42:33] INFO:    2. Deploy hotfix by tomorrow
+[15:42:33] INFO:       Priority: High | Category: Work | Due: 2025-09-24
+[15:42:33] INFO: ✅ Task count validation PASSED (expected: 2)
+[15:42:33] INFO: ✅ Priority validation PASSED
+[15:42:33] INFO: 
+============================================================
+[15:42:33] INFO: 🧪 TEST: Medium priority tasks
+[15:42:33] INFO: 📝 Input: 'Should review code this week; need to update documentation'
+[15:42:33] INFO: ✅ SUCCESS: Extracted 2 tasks
+[15:42:33] INFO:    1. Should review code this week
+[15:42:33] INFO:       Priority: Medium | Category: Work | Due: 2025-09-26
+[15:42:33] INFO:    2. Update documentation
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO: ✅ Task count validation PASSED (expected: 2)
+[15:42:33] INFO: ✅ Priority validation PASSED
+[15:42:33] INFO: 
+============================================================
+[15:42:33] INFO: 🧪 TEST: Low priority tasks
+[15:42:33] INFO: 📝 Input: 'Eventually migrate framework; optional refactor when possible'
+[15:42:33] INFO: ✅ SUCCESS: Extracted 2 tasks
+[15:42:33] INFO:    1. Eventually migrate framework
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    2. Optional refactor when possible
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO: ✅ Task count validation PASSED (expected: 2)
+[15:42:33] INFO: ✅ Priority validation PASSED
+[15:42:33] INFO: 
+📅 DATE DETECTION TESTS
+[15:42:33] INFO: 
+============================================================
+[15:42:33] INFO: 🧪 TEST: Today/Tomorrow patterns
+[15:42:33] INFO: 📝 Input: 'Fix bug today; deploy tomorrow; meeting this Friday'
+[15:42:33] INFO: ✅ SUCCESS: Extracted 3 tasks
+[15:42:33] INFO:    1. Fix bug today
+[15:42:33] INFO:       Priority: High | Category: Work | Due: 2025-09-23
+[15:42:33] INFO:    2. Deploy tomorrow
+[15:42:33] INFO:       Priority: High | Category: Work | Due: 2025-09-24
+[15:42:33] INFO:    3. Meeting this friday
+[15:42:33] INFO:       Priority: Low | Category: Meetings | Due: 2025-09-26
+[15:42:33] INFO: ✅ Task count validation PASSED (expected: 3)
+[15:42:33] INFO: 
+============================================================
+[15:42:33] INFO: 🧪 TEST: Weekday abbreviations
+[15:42:33] INFO: 📝 Input: 'Call client by thurs; submit report on fri; meeting next mon'
+[15:42:33] INFO: ✅ SUCCESS: Extracted 3 tasks
+[15:42:33] INFO:    1. Client by thurs
+[15:42:33] INFO:       Priority: Low | Category: Work | Due: 2025-09-25
+[15:42:33] INFO:    2. Submit report on fri
+[15:42:33] INFO:       Priority: Low | Category: Work | Due: 2025-09-26
+[15:42:33] INFO:    3. Meeting
+[15:42:33] INFO:       Priority: Low | Category: Meetings
+[15:42:33] INFO: ✅ Task count validation PASSED (expected: 3)
+[15:42:33] INFO: 
+============================================================
+[15:42:33] INFO: 🧪 TEST: This week patterns
+[15:42:33] INFO: 📝 Input: 'Review code this week; deadline by end of week'
+[15:42:33] INFO: ✅ SUCCESS: Extracted 2 tasks
+[15:42:33] INFO:    1. Code this week
+[15:42:33] INFO:       Priority: Medium | Category: Work | Due: 2025-09-26
+[15:42:33] INFO:    2. Deadline by end of week
+[15:42:33] INFO:       Priority: High | Category: Work | Due: 2025-09-26
+[15:42:33] INFO: ✅ Task count validation PASSED (expected: 2)
+[15:42:33] INFO: 
+🔗 COMPOUND TASK SPLITTING TESTS
+[15:42:33] INFO: 
+============================================================
+[15:42:33] INFO: 🧪 TEST: Simple 'and' patterns
+[15:42:33] INFO: 📝 Input: 'Update docs and deploy app and notify team'
+[15:42:33] INFO: ✅ SUCCESS: Extracted 2 tasks
+[15:42:33] INFO:    1. Deploy app
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    2. Notify team
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO: ❌ Task count validation FAILED (expected: 3, got: 2)
+[15:42:33] INFO: 
+============================================================
+[15:42:33] INFO: 🧪 TEST: Dependency patterns
+[15:42:33] INFO: 📝 Input: 'Deploy to production tomorrow, before that run tests today'
+[15:42:33] INFO: ✅ SUCCESS: Extracted 2 tasks
+[15:42:33] INFO:    1. Run tests today
+[15:42:33] INFO:       Priority: High | Category: Work | Due: 2025-09-23
+[15:42:33] INFO:    2. Deploy to production tomorrow
+[15:42:33] INFO:       Priority: High | Category: Work | Due: 2025-09-24
+[15:42:33] INFO: ✅ Task count validation PASSED (expected: 2)
+[15:42:33] INFO: 
+============================================================
+[15:42:33] INFO: 🧪 TEST: Bill payment patterns
+[15:42:33] INFO: 📝 Input: 'Pay 2450 and 2369 rupees respectively for electricity and internet bills'
+[15:42:33] INFO: ✅ SUCCESS: Extracted 2 tasks
+[15:42:33] INFO:    1. Pay electricity bill ₹2450
+[15:42:33] INFO:       Priority: Low | Category: Personal
+[15:42:33] INFO:    2. Pay internet bill ₹2369
+[15:42:33] INFO:       Priority: Low | Category: Personal
+[15:42:33] INFO: ✅ Task count validation PASSED (expected: 2)
+[15:42:33] INFO: 
+============================================================
+[15:42:33] INFO: 🧪 TEST: Project-specific patterns
+[15:42:33] INFO: 📝 Input: 'Create user stories for CABP project as well as for sentilink'
+[15:42:33] INFO: ✅ SUCCESS: Extracted 2 tasks
+[15:42:33] INFO:    1. User stories for cabp project
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    2. User stories for for sentilink
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO: ✅ Task count validation PASSED (expected: 2)
+[15:42:33] INFO: 
+📧 EMAIL-STYLE PROCESSING TESTS
+[15:42:33] INFO: 
+============================================================
+[15:42:33] INFO: 🧪 TEST: Can we pattern
+[15:42:33] INFO: 📝 Input: 'Can we restart the server and share performance report by tomorrow?'
+[15:42:33] INFO: ✅ SUCCESS: Extracted 2 tasks
+[15:42:33] INFO:    1. Server
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    2. Performance report
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO: ✅ Task count validation PASSED (expected: 2)
+[15:42:33] INFO: 
+============================================================
+[15:42:33] INFO: 🧪 TEST: Complex email request
+[15:42:33] INFO: 📝 Input: 'Please deploy to staging and run tests. Also, update the SSL certificates.'
+[15:42:33] INFO: ✅ SUCCESS: Extracted 2 tasks
+[15:42:33] INFO:    1. Deploy to staging
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    2. Run tests. also, update the ssl certificates
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO: ✅ Task count validation PASSED (expected: 2)
+[15:42:33] INFO: 
+📂 CATEGORY CLASSIFICATION TESTS
+[15:42:33] INFO: 
+============================================================
+[15:42:33] INFO: 🧪 TEST: Work tasks
+[15:42:33] INFO: 📝 Input: 'Fix API bug; deploy to AWS; update documentation'
+[15:42:33] INFO: ✅ SUCCESS: Extracted 3 tasks
+[15:42:33] INFO:    1. Fix api bug
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    2. Deploy to aws
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    3. Documentation
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO: ✅ Task count validation PASSED (expected: 3)
+[15:42:33] INFO: 
+============================================================
+[15:42:33] INFO: 🧪 TEST: Meeting tasks
+[15:42:33] INFO: 📝 Input: 'Schedule standup; conference call with client; 1:1 with manager'
+[15:42:33] INFO: ✅ SUCCESS: Extracted 3 tasks
+[15:42:33] INFO:    1. Schedule standup
+[15:42:33] INFO:       Priority: Low | Category: Meetings
+[15:42:33] INFO:    2. Conference call with client
+[15:42:33] INFO:       Priority: Low | Category: Meetings
+[15:42:33] INFO:    3. 1:1 with manager
+[15:42:33] INFO:       Priority: Low | Category: Meetings
+[15:42:33] INFO: ✅ Task count validation PASSED (expected: 3)
+[15:42:33] INFO: 
+============================================================
+[15:42:33] INFO: 🧪 TEST: Personal tasks
+[15:42:33] INFO: 📝 Input: 'Call mom; pay electricity bill; buy groceries; dentist appointment'
+[15:42:33] INFO: ✅ SUCCESS: Extracted 3 tasks
+[15:42:33] INFO:    1. Pay electricity bill
+[15:42:33] INFO:       Priority: Low | Category: Personal
+[15:42:33] INFO:    2. Buy groceries
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    3. Dentist appointment
+[15:42:33] INFO:       Priority: Low | Category: Meetings
+[15:42:33] INFO: ❌ Task count validation FAILED (expected: 4, got: 3)
+[15:42:33] INFO: 
+============================================================
+[15:42:33] INFO: 🧪 TEST: Admin tasks
+[15:42:33] INFO: 📝 Input: 'Submit expense reports; complete HR forms; book travel'
+[15:42:33] INFO: ✅ SUCCESS: Extracted 3 tasks
+[15:42:33] INFO:    1. Submit expense reports
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    2. Hr forms
+[15:42:33] INFO:       Priority: Low | Category: Admin
+[15:42:33] INFO:    3. Book travel
+[15:42:33] INFO:       Priority: Low | Category: Admin
+[15:42:33] INFO: ✅ Task count validation PASSED (expected: 3)
+[15:42:33] INFO: 
+🎯 EDGE CASES AND COMPLEX SCENARIOS
+[15:42:33] INFO: 
+============================================================
+[15:42:33] INFO: 🧪 TEST: Empty input
+[15:42:33] INFO: 📝 Input: ''
+[15:42:33] INFO: ❌ FAILED: No tasks found in the input text
+[15:42:33] INFO: 
+============================================================
+[15:42:33] INFO: 🧪 TEST: Single word
+[15:42:33] INFO: 📝 Input: 'documentation'
+[15:42:33] INFO: ✅ SUCCESS: Extracted 1 tasks
+[15:42:33] INFO:    1. Documentation
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO: ✅ Task count validation PASSED (expected: 1)
+[15:42:33] INFO: 
+============================================================
+[15:42:33] INFO: 🧪 TEST: Very complex mixed input
+[15:42:33] INFO: 📝 Input: 'URGENT: Fix payment gateway bug ASAP!\nCan we also restart the server and deploy hotfix by tomorrow?\n- Update API documentation\n- Schedule post-mortem meeting\nPay internet bill today; call mom about birthday party;\nReview quarterly reports this week, before that gather all data'
+[15:42:33] INFO: ✅ SUCCESS: Extracted 2 tasks
+[15:42:33] INFO:    1. Also restart the server
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    2. Deploy hotfix by tomorrow
+[15:42:33] INFO:       Priority: High | Category: Work | Due: 2025-09-24
+[15:42:33] INFO: ❌ Task count validation FAILED (expected: 7, got: 2)
+[15:42:33] INFO: 
+============================================================
+[15:42:33] INFO: 🧪 TEST: Duplicate removal test
+[15:42:33] INFO: 📝 Input: 'update docs; fix bug; update docs; deploy app; FIX BUG'
+[15:42:33] INFO: ✅ SUCCESS: Extracted 2 tasks
+[15:42:33] INFO:    1. Fix bug
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    2. Deploy app
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO: ❌ Task count validation FAILED (expected: 3, got: 2)
+[15:42:33] INFO: 
+🚀 PERFORMANCE TESTS
+[15:42:33] INFO: 
+============================================================
+[15:42:33] INFO: 🧪 TEST: Large input with many tasks
+[15:42:33] INFO: 📝 Input: 'task_1; task_2; task_3; task_4; task_5; task_6; task_7; task_8; task_9; task_10; task_11; task_12; task_13; task_14; task_15; task_16; task_17; task_18; task_19; task_20'
+[15:42:33] INFO: ✅ SUCCESS: Extracted 20 tasks
+[15:42:33] INFO:    1. Task_1
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    2. Task_2
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    3. Task_3
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    4. Task_4
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    5. Task_5
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    6. Task_6
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    7. Task_7
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    8. Task_8
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    9. Task_9
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    10. Task_10
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    11. Task_11
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    12. Task_12
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    13. Task_13
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    14. Task_14
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    15. Task_15
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    16. Task_16
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    17. Task_17
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    18. Task_18
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    19. Task_19
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    20. Task_20
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO: ✅ Task count validation PASSED (expected: 20)
+[15:42:33] INFO: 
+============================================================
+[15:42:33] INFO: 🧪 TEST: Very long task description
+[15:42:33] INFO: 📝 Input: 'This is a very long task description that contains multiple sentences and should be processed correctly even though it has many words and complex structure that might challenge the parsing logic'
+[15:42:33] INFO: ✅ SUCCESS: Extracted 3 tasks
+[15:42:33] INFO:    1. This is a very long task description that contains multiple sentences
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO:    2. Should be processed correctly even though it has many words
+[15:42:33] INFO:       Priority: Medium | Category: Work
+[15:42:33] INFO:    3. Complex structure that might challenge the parsing logic
+[15:42:33] INFO:       Priority: Low | Category: Work
+[15:42:33] INFO: ❌ Task count validation FAILED (expected: 1, got: 3)
+[15:42:33] INFO: 
+================================================================================
+[15:42:33] INFO: 📊 TEST SUITE SUMMARY
+[15:42:33] INFO: ================================================================================
+[15:42:33] INFO: 🔢 Total Tests: 26
+[15:42:33] INFO: ✅ Passed: 25
+[15:42:33] INFO: ❌ Failed: 1
+[15:42:33] INFO: 📈 Success Rate: 96.2%
+[15:42:33] INFO: 🎉 EXCELLENT: System performing very well!
+[15:42:33] INFO: 🕒 Completed at: 2025-09-23 15:42:33
