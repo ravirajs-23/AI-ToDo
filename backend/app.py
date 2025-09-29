@@ -314,6 +314,9 @@ def process_tasks():
         result = task_processor.process_tasks(raw_text)
         
         if result['success']:
+            # Add AI provider info to the result
+            result['ai_provider'] = ai_provider
+            
             # Save tasks to database
             conn = get_db_connection()
             cursor = conn.cursor()

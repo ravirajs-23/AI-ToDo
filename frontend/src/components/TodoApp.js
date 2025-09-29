@@ -25,6 +25,7 @@ const TodoApp = () => {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [aiProvider, setAiProvider] = useState('');
   const [filter, setFilter] = useState({
     status: 'all',
     priority: 'all',
@@ -74,15 +75,19 @@ const TodoApp = () => {
       });
 
       if (response.data.success) {
-        setMessage(`Successfully processed ${response.data.tasks.length} tasks!`);
+        const provider = response.data.ai_provider || 'Unknown';
+        setMessage(`Successfully processed ${response.data.tasks.length} tasks using ${provider}!`);
+        setAiProvider(provider);
         setRawText('');
         loadTasks(); // Reload tasks to show new ones
       } else {
         setMessage(response.data.message || 'Error processing tasks');
+        setAiProvider('');
       }
     } catch (error) {
       console.error('Error processing tasks:', error);
       setMessage('Error processing tasks. Make sure the backend is running.');
+      setAiProvider('');
     } finally {
       setLoading(false);
     }
@@ -303,7 +308,14 @@ const TodoApp = () => {
                 ? 'bg-red-100 text-red-700 border border-red-200' 
                 : 'bg-green-100 text-green-700 border border-green-200'
             }`}>
-              {message}
+              <div className="flex items-center justify-between">
+                <span>{message}</span>
+                {aiProvider && !message.includes('Error') && (
+                  <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-medium">
+                    🤖 {aiProvider.toUpperCase()}
+                  </span>
+                )}
+              </div>
             </div>
           )}
         </div>

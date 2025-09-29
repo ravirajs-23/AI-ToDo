@@ -55,7 +55,7 @@ class TaskProcessor:
             'work': ['meeting', 'client', 'project', 'presentation', 'report', 'deadline', 'email', 'call', 'ppt', 'deck', 'aws', 'logs', 'ssl', 'cert', 'portal', 'intern', 'bug', 'navbar', 'mobile', 's3', 'upload', 'timesheet', 'townhall', 'domain', 'readme', 'invoice', 'followup', 'demo', 'export', 'data', 'report', 'team', 'lunch', 'building', 'activity', 'software', 'update', 'inbox', 'slides', 'cabp', 'ap', 'apprisals', 'feedback form', 'mgmt', 'management'],
             'admin': ['paperwork', 'forms', 'billing', 'invoice', 'expense', 'hr', 'admin', 'travel', 'reimbursement', 'hiring', 'loop', 'q3', 'leave request', 'avs'],
             'meetings': ['meeting', 'call', 'conference', 'discussion', 'sync', 'standup', 'retro', '1:1', 'amit', 'setup meeting', 'apprisals'],
-            'personal': ['grocery', 'doctor', 'family', 'personal', 'home', 'shopping', 'mom', 'bday', 'birthday', 'gift', 'internet', 'bill', 'electricity', 'power', 'recharge', 'payment', 'dentist', 'appointment', 'insurance', 'vehicle', 'travel', 'tickets', 'snacks', 'utility', 'water']
+            'personal': ['grocery', 'doctor', 'family', 'personal', 'home', 'shopping', 'mom', 'bday', 'birthday', 'gift', 'internet', 'bill', 'electricity', 'power', 'recharge', 'payment', 'dentist', 'appointment', 'insurance', 'vehicle', 'travel', 'tickets', 'snacks', 'utility', 'water', 'buy', 'purchase', 'get', 'pick up', 'apples', 'food', 'groceries', 'snack', 'lunch', 'dinner', 'breakfast']
         }
     
     def _initialize_ai_client(self):
@@ -157,8 +157,8 @@ Return format: ["task1", "task2", "task3", ...]
             return self._clean_task_list(all_tasks)
         
         # Strategy 2: Handle complex compound sentences with multiple separators
-        # First, try to identify major task boundaries using periods and semicolons
-        major_splits = re.split(r'[.!?;]+', cleaned_text)
+        # First, try to identify major task boundaries using periods, semicolons, and newlines
+        major_splits = re.split(r'[.!?;\n]+', cleaned_text)
         major_tasks = [task.strip() for task in major_splits if task.strip()]
         
         for major_task in major_tasks:
@@ -201,7 +201,17 @@ Return format: ["task1", "task2", "task3", ...]
         # Strategy 3: If no major splits found, try comma-based splitting
         if len(all_tasks) <= 1:
             all_tasks = []
-            if ',' in cleaned_text:
+            # First try newline splitting
+            if '\n' in cleaned_text:
+                newline_tasks = [task.strip() for task in cleaned_text.split('\n') if task.strip()]
+                for task in newline_tasks:
+                    if any(indicator in task.lower() for indicator in [' and ', ' also ', ' then ', ' before that ']):
+                        compound_tasks = self._split_compound_task(task)
+                        all_tasks.extend(compound_tasks)
+                    else:
+                        all_tasks.append(task)
+            # Then try comma-based splitting
+            elif ',' in cleaned_text:
                 comma_tasks = [task.strip() for task in cleaned_text.split(',') if task.strip()]
                 for task in comma_tasks:
                     if any(indicator in task.lower() for indicator in [' and ', ' also ', ' then ', ' before that ']):
@@ -425,7 +435,7 @@ Return only the category name (Work/Meetings/Personal/Admin):
             category_scores['meetings'] = category_scores.get('meetings', 0) + 3
         
         # Special handling for personal tasks
-        personal_indicators = ['mom', 'dad', 'family', 'birthday', 'bday', 'gift', 'personal', 'home', 'shopping', 'grocery', 'doctor', 'internet', 'bill', 'electricity', 'recharge', 'payment']
+        personal_indicators = ['mom', 'dad', 'family', 'birthday', 'bday', 'gift', 'personal', 'home', 'shopping', 'grocery', 'doctor', 'internet', 'bill', 'electricity', 'recharge', 'payment', 'buy', 'purchase', 'get', 'pick up', 'apples', 'food', 'snacks', 'snack', 'lunch', 'dinner', 'breakfast']
         if any(indicator in task_lower for indicator in personal_indicators):
             category_scores['personal'] = category_scores.get('personal', 0) + 2
         
@@ -827,7 +837,8 @@ Return only the date in YYYY-MM-DD format or "null":
                 return {
                     'success': False,
                     'message': 'No tasks found in the input text',
-                    'tasks': []
+                    'tasks': [],
+                    'ai_provider': self.ai_provider
                 }
             
             # Process each task
@@ -846,14 +857,16 @@ Return only the date in YYYY-MM-DD format or "null":
             return {
                 'success': True,
                 'message': f'Successfully processed {len(processed_tasks)} tasks using {self.ai_provider}',
-                'tasks': processed_tasks
+                'tasks': processed_tasks,
+                'ai_provider': self.ai_provider
             }
             
         except Exception as e:
             return {
                 'success': False,
                 'message': f'Error processing tasks: {str(e)}',
-                'tasks': []
+                'tasks': [],
+                'ai_provider': self.ai_provider
             }
 
 
