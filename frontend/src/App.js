@@ -1,6 +1,6 @@
 import React from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import GoogleLogin from './components/GoogleLogin';
+import Auth from './components/Auth';
 import TodoApp from './components/TodoApp';
 import './index.css';
 
@@ -19,7 +19,7 @@ function AppContent() {
   }
 
   if (!user) {
-    return <GoogleLogin />;
+    return <Auth />;
   }
 
   return <TodoApp />;

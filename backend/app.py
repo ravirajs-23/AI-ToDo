@@ -12,7 +12,8 @@ from datetime import datetime
 from ai_processor import TaskProcessor
 from auth import (
     login_manager, User, verify_google_token, get_or_create_user, 
-    init_auth_database, auth_required, get_current_user_id
+    init_auth_database, auth_required, get_current_user_id,
+    create_email_user, authenticate_email_user
 )
 import os
 
@@ -180,6 +181,111 @@ def get_current_user():
             'picture': current_user.picture
         }
     })
+
+@app.route('/api/auth/register', methods=['POST'])
+def register():
+    """Email/password registration endpoint."""
+    try:
+        data = request.get_json()
+        
+        if not data or not all(k in data for k in ['email', 'password', 'name']):
+            return jsonify({
+                'success': False,
+                'message': 'Email, password, and name are required'
+            }), 400
+        
+        email = data['email'].strip().lower()
+        password = data['password']
+        name = data['name'].strip()
+        
+        # Create user
+        user_id, message = create_email_user(email, password, name)
+        
+        if user_id is None:
+            return jsonify({
+                'success': False,
+                'message': message
+            }), 400
+        
+        # Create user object for Flask-Login
+        user = User(
+            user_id=user_id,
+            email=email,
+            name=name,
+            picture=None
+        )
+        
+        # Log in user
+        login_user(user)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Registration successful',
+            'user': {
+                'id': user_id,
+                'email': email,
+                'name': name,
+                'picture': None
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Registration error: {str(e)}'
+        }), 500
+
+@app.route('/api/auth/login-email', methods=['POST'])
+def login_email():
+    """Email/password login endpoint."""
+    try:
+        data = request.get_json()
+        
+        if not data or not all(k in data for k in ['email', 'password']):
+            return jsonify({
+                'success': False,
+                'message': 'Email and password are required'
+            }), 400
+        
+        email = data['email'].strip().lower()
+        password = data['password']
+        
+        # Authenticate user
+        user_info, message = authenticate_email_user(email, password)
+        
+        if user_info is None:
+            return jsonify({
+                'success': False,
+                'message': message
+            }), 401
+        
+        # Create user object for Flask-Login
+        user = User(
+            user_id=user_info['user_id'],
+            email=user_info['email'],
+            name=user_info['name'],
+            picture=user_info['picture']
+        )
+        
+        # Log in user
+        login_user(user)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Login successful',
+            'user': {
+                'id': user_info['user_id'],
+                'email': user_info['email'],
+                'name': user_info['name'],
+                'picture': user_info['picture']
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Login error: {str(e)}'
+        }), 500
 
 @app.route('/api/process-tasks', methods=['POST'])
 @auth_required

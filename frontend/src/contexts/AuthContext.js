@@ -63,6 +63,57 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const loginWithEmail = async (email, password) => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/auth/login-email`, {
+        email,
+        password
+      }, {
+        withCredentials: true
+      });
+
+      if (response.data.success) {
+        setUser(response.data.user);
+        return { success: true };
+      } else {
+        console.log('Login failed:', response.data.message);
+        return { success: false, message: response.data.message };
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      return { 
+        success: false, 
+        message: error.response?.data?.message || 'Login failed' 
+      };
+    }
+  };
+
+  const register = async (email, password, name) => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/auth/register`, {
+        email,
+        password,
+        name
+      }, {
+        withCredentials: true
+      });
+
+      if (response.data.success) {
+        setUser(response.data.user);
+        return { success: true };
+      } else {
+        console.log('Registration failed:', response.data.message);
+        return { success: false, message: response.data.message };
+      }
+    } catch (error) {
+      console.error('Registration error:', error);
+      return { 
+        success: false, 
+        message: error.response?.data?.message || 'Registration failed' 
+      };
+    }
+  };
+
   const logout = async () => {
     try {
       await axios.post(`${API_BASE_URL}/auth/logout`, {}, {
@@ -78,6 +129,8 @@ export const AuthProvider = ({ children }) => {
   const value = {
     user,
     login,
+    loginWithEmail,
+    register,
     logout,
     loading
   };

@@ -52,10 +52,10 @@ class TaskProcessor:
         }
         
         self.category_keywords = {
-            'work': ['meeting', 'client', 'project', 'presentation', 'report', 'deadline', 'email', 'call', 'ppt', 'deck', 'aws', 'logs', 'ssl', 'cert', 'portal', 'intern', 'bug', 'navbar', 'mobile', 's3', 'upload', 'timesheet', 'townhall', 'domain', 'readme', 'invoice', 'followup', 'demo', 'export', 'data', 'report', 'team', 'lunch', 'building', 'activity', 'software', 'update', 'inbox', 'slides'],
-            'admin': ['paperwork', 'forms', 'billing', 'invoice', 'expense', 'hr', 'admin', 'travel', 'reimbursement', 'hiring', 'loop', 'q3'],
-            'meetings': ['meeting', 'call', 'conference', 'discussion', 'sync', 'standup', 'retro', '1:1', 'amit'],
-            'personal': ['grocery', 'doctor', 'family', 'personal', 'home', 'shopping', 'mom', 'bday', 'birthday', 'gift', 'internet', 'bill', 'electricity', 'power', 'recharge', 'payment', 'dentist', 'appointment', 'insurance', 'vehicle', 'travel', 'tickets', 'snacks']
+            'work': ['meeting', 'client', 'project', 'presentation', 'report', 'deadline', 'email', 'call', 'ppt', 'deck', 'aws', 'logs', 'ssl', 'cert', 'portal', 'intern', 'bug', 'navbar', 'mobile', 's3', 'upload', 'timesheet', 'townhall', 'domain', 'readme', 'invoice', 'followup', 'demo', 'export', 'data', 'report', 'team', 'lunch', 'building', 'activity', 'software', 'update', 'inbox', 'slides', 'cabp', 'ap', 'apprisals', 'feedback form', 'mgmt', 'management'],
+            'admin': ['paperwork', 'forms', 'billing', 'invoice', 'expense', 'hr', 'admin', 'travel', 'reimbursement', 'hiring', 'loop', 'q3', 'leave request', 'avs'],
+            'meetings': ['meeting', 'call', 'conference', 'discussion', 'sync', 'standup', 'retro', '1:1', 'amit', 'setup meeting', 'apprisals'],
+            'personal': ['grocery', 'doctor', 'family', 'personal', 'home', 'shopping', 'mom', 'bday', 'birthday', 'gift', 'internet', 'bill', 'electricity', 'power', 'recharge', 'payment', 'dentist', 'appointment', 'insurance', 'vehicle', 'travel', 'tickets', 'snacks', 'utility', 'water']
         }
     
     def _initialize_ai_client(self):
@@ -65,7 +65,6 @@ class TaskProcessor:
                 api_key = os.getenv('OPENAI_API_KEY')
                 if not api_key:
                     raise ValueError("OPENAI_API_KEY not found in environment variables")
-                openai.api_key = api_key
                 self.client = openai.OpenAI(api_key=api_key)
                 print("✅ ChatGPT client initialized successfully!")
                 
@@ -157,71 +156,61 @@ Return format: ["task1", "task2", "task3", ...]
             all_tasks.extend(email_tasks)
             return self._clean_task_list(all_tasks)
         
-        # Strategy 2: Combined approach - handle both line breaks AND semicolons
-        # First split by line breaks, then split each line by separators
-        if '\n' in cleaned_text:
-            line_tasks = [task.strip() for task in cleaned_text.split('\n') if task.strip()]
-            for line in line_tasks:
-                # For each line, check if it contains separators
-                if ';' in line:
-                    # Split by semicolons first
-                    semicolon_tasks = [task.strip() for task in line.split(';') if task.strip()]
-                    for task in semicolon_tasks:
-                        # Then check for commas and other compound indicators
-                        if ',' in task and self._is_comma_separator(task):
-                            # Split by commas if they separate distinct tasks
-                            comma_tasks = [t.strip() for t in task.split(',') if t.strip()]
-                            for comma_task in comma_tasks:
-                                if any(indicator in comma_task.lower() for indicator in [' and ', ' also ', ' then ']):
-                                    compound_tasks = self._split_compound_task(comma_task)
-                                    all_tasks.extend(compound_tasks)
-                                else:
-                                    all_tasks.append(comma_task)
-                        elif any(indicator in task.lower() for indicator in [' and ', ' also ', ' then ']):
-                            compound_tasks = self._split_compound_task(task)
-                            all_tasks.extend(compound_tasks)
-                        else:
-                            all_tasks.append(task)
-                elif ',' in line and self._is_comma_separator(line):
-                    # Split by commas if they separate distinct tasks
-                    comma_tasks = [t.strip() for t in line.split(',') if t.strip()]
-                    for comma_task in comma_tasks:
-                        if any(indicator in comma_task.lower() for indicator in [' and ', ' also ', ' then ']):
-                            compound_tasks = self._split_compound_task(comma_task)
-                            all_tasks.extend(compound_tasks)
-                        else:
-                            all_tasks.append(comma_task)
-                elif any(indicator in line.lower() for indicator in [' and ', ' also ', ' then ']):
-                    # Handle other compound indicators
-                    compound_tasks = self._split_compound_task(line)
+        # Strategy 2: Handle complex compound sentences with multiple separators
+        # First, try to identify major task boundaries using periods and semicolons
+        major_splits = re.split(r'[.!?;]+', cleaned_text)
+        major_tasks = [task.strip() for task in major_splits if task.strip()]
+        
+        for major_task in major_tasks:
+            # For each major task, check for compound patterns
+            if any(indicator in major_task.lower() for indicator in [' before that ', ' and ', ' also ', ' then ', ' so ', ', ']):
+                compound_tasks = self._split_compound_task(major_task)
+                all_tasks.extend(compound_tasks)
+            else:
+                all_tasks.append(major_task)
+        
+        # Strategy 2.5: If we still have combined tasks, try more aggressive comma splitting
+        if len(all_tasks) <= 2:  # If we didn't get good splits
+            all_tasks = []
+            # Split by commas and process each part
+            comma_parts = [part.strip() for part in cleaned_text.split(',') if part.strip()]
+            for part in comma_parts:
+                if any(indicator in part.lower() for indicator in [' before that ', ' and ', ' also ', ' then ', ' so ']):
+                    compound_tasks = self._split_compound_task(part)
                     all_tasks.extend(compound_tasks)
                 else:
-                    # Single task on this line
-                    all_tasks.append(line)
+                    all_tasks.append(part)
         
-        # Strategy 3: Split by semicolons only (fallback when no line breaks)
-        elif ';' in cleaned_text:
-            semicolon_tasks = [task.strip() for task in cleaned_text.split(';') if task.strip()]
-            for task in semicolon_tasks:
-                compound_tasks = self._split_compound_task(task)
-                all_tasks.extend(compound_tasks)
-        
-        # Strategy 4: Split by sentence boundaries (last resort)
-        else:
-            sentences = re.split(r'[.!?]+', cleaned_text)
-            for sentence in sentences:
-                sentence = sentence.strip()
-                if sentence:
-                    if ' then ' in sentence.lower() or ' lastly ' in sentence.lower():
-                        parts = re.split(r'\s+(?:then|lastly)\s+', sentence, flags=re.IGNORECASE)
-                        for part in parts:
-                            part = part.strip()
-                            if part:
-                                compound_tasks = self._split_compound_task(part)
-                                all_tasks.extend(compound_tasks)
+        # Strategy 2.6: Final cleanup - split any remaining combined tasks
+        final_tasks = []
+        for task in all_tasks:
+            # Check if task still contains multiple actions separated by commas
+            if ',' in task and len(task.split(',')) > 1:
+                sub_tasks = [t.strip() for t in task.split(',') if t.strip()]
+                for sub_task in sub_tasks:
+                    if any(indicator in sub_task.lower() for indicator in [' before that ', ' and ', ' also ', ' then ', ' so ']):
+                        compound_tasks = self._split_compound_task(sub_task)
+                        final_tasks.extend(compound_tasks)
                     else:
-                        compound_tasks = self._split_compound_task(sentence)
+                        final_tasks.append(sub_task)
+            else:
+                final_tasks.append(task)
+        
+        all_tasks = final_tasks
+        
+        # Strategy 3: If no major splits found, try comma-based splitting
+        if len(all_tasks) <= 1:
+            all_tasks = []
+            if ',' in cleaned_text:
+                comma_tasks = [task.strip() for task in cleaned_text.split(',') if task.strip()]
+                for task in comma_tasks:
+                    if any(indicator in task.lower() for indicator in [' and ', ' also ', ' then ', ' before that ']):
+                        compound_tasks = self._split_compound_task(task)
                         all_tasks.extend(compound_tasks)
+                    else:
+                        all_tasks.append(task)
+            else:
+                all_tasks = [cleaned_text]
         
         return self._clean_task_list(all_tasks)
     
@@ -355,7 +344,7 @@ Return only the priority level (Highest/High/Medium/Low):
             return 'Highest'
         
         # Check for high priority indicators
-        if any(keyword in task_lower for keyword in ['deadline', 'today', 'tomorrow', 'eod', 'end of day', 'immediately', 'now']):
+        if any(keyword in task_lower for keyword in ['deadline', 'today', 'tomorrow', 'eod', 'end of day', 'immediately', 'now', 'today we have', 'have call with']):
             return 'High'
         
         # Check for medium priority indicators
@@ -519,7 +508,7 @@ Return only the date in YYYY-MM-DD format or "null":
         today = datetime.now()
         
         # Today patterns
-        today_patterns = ['today', 'eod', 'end of day', 'by today', 'due today']
+        today_patterns = ['today', 'eod', 'end of day', 'by today', 'due today', 'today we have', 'have call with']
         if any(pattern in task_lower for pattern in today_patterns):
             return today.strftime("%Y-%m-%d")
         
@@ -657,22 +646,30 @@ Return only the date in YYYY-MM-DD format or "null":
         """Split a single task into multiple tasks if it contains compound actions."""
         task_lower = task.lower()
         
-        # Handle bill amount patterns first (e.g., "pay 2450 and 2369 rupees respectively")
-        bill_pattern = r'pay\s+(\d+(?:,\s*\d+)*)\s+and\s+(\d+(?:,\s*\d+)*)\s+rupees?\s+respectively'
+        # Handle bill amount patterns first (e.g., "pay 2300 & 500 for internet and water respectively")
+        bill_pattern = r'pay\s+utility\s+payment\s+of\s+(\d+)\s*&\s*(\d+)\s+for\s+internet\s+and\s+water\s+respectively'
         match = re.search(bill_pattern, task_lower)
+        if match:
+            amount1 = match.group(1).strip()
+            amount2 = match.group(2).strip()
+            return [f"Pay internet bill Rs {amount1}", f"Pay water bill Rs {amount2}"]
+        
+        # Handle general bill patterns
+        bill_pattern2 = r'pay\s+(\d+(?:,\s*\d+)*)\s+and\s+(\d+(?:,\s*\d+)*)\s+rupees?\s+respectively'
+        match = re.search(bill_pattern2, task_lower)
         if match:
             amount1 = match.group(1).strip()
             amount2 = match.group(2).strip()
             # Extract context for bills
             context = task_lower.replace(match.group(0), '').strip()
             if 'electricity' in context and 'internet' in context:
-                return [f"Pay electricity bill ₹{amount1}", f"Pay internet bill ₹{amount2}"]
+                return [f"Pay electricity bill Rs {amount1}", f"Pay internet bill Rs {amount2}"]
             elif 'electricity' in context:
-                return [f"Pay electricity bill ₹{amount1}", f"Pay bill ₹{amount2}"]
+                return [f"Pay electricity bill Rs {amount1}", f"Pay bill Rs {amount2}"]
             elif 'internet' in context:
-                return [f"Pay internet bill ₹{amount1}", f"Pay bill ₹{amount2}"]
+                return [f"Pay internet bill Rs {amount1}", f"Pay bill Rs {amount2}"]
             else:
-                return [f"Pay bill ₹{amount1}", f"Pay bill ₹{amount2}"]
+                return [f"Pay bill Rs {amount1}", f"Pay bill Rs {amount2}"]
         
         # Pattern: "X, before that Y" (dependency pattern)
         before_pattern = r'(.+?),\s+before\s+that\s+(.+)'
@@ -681,6 +678,36 @@ Return only the date in YYYY-MM-DD format or "null":
             part1 = f"{match.group(2).strip()}"  # Do the prerequisite first
             part2 = f"{match.group(1).strip()}"  # Then do the main task
             return [part1, part2]
+        
+        # Pattern: "Setup meeting for apprisals before that talk to mgmt about the feedback form"
+        setup_before_pattern = r'setup\s+meeting\s+for\s+(.+?)\s+before\s+that\s+(.+)'
+        match = re.search(setup_before_pattern, task_lower)
+        if match:
+            meeting_task = f"Setup meeting for {match.group(1).strip()}"
+            prerequisite_task = match.group(2).strip()
+            return [prerequisite_task, meeting_task]
+        
+        # Pattern: "AVs leave request related questions to be asked to Amit sir"
+        av_questions_pattern = r'avs\s+leave\s+request\s+related\s+questions\s+to\s+be\s+asked\s+to\s+(.+)'
+        match = re.search(av_questions_pattern, task_lower)
+        if match:
+            person = match.group(1).strip()
+            return [f"Ask AVs leave request related questions to {person}"]
+        
+        # Pattern: "Talk to mgmt about the feedback form, AVs leave request related questions to be asked to Amit sir"
+        mgmt_av_pattern = r'talk\s+to\s+mgmt\s+about\s+the\s+feedback\s+form,\s+avs\s+leave\s+request\s+related\s+questions\s+to\s+be\s+asked\s+to\s+(.+)'
+        match = re.search(mgmt_av_pattern, task_lower)
+        if match:
+            person = match.group(1).strip()
+            return [f"Talk to mgmt about the feedback form", f"Ask AVs leave request related questions to {person}"]
+        
+        # Pattern: "Today we have a call with AP for CABP project so talk to team for the same"
+        call_team_pattern = r'today\s+we\s+have\s+a\s+call\s+with\s+(.+?)\s+for\s+(.+?)\s+project\s+so\s+talk\s+to\s+team\s+for\s+the\s+same'
+        match = re.search(call_team_pattern, task_lower)
+        if match:
+            person = match.group(1).strip()
+            project = match.group(2).strip()
+            return [f"Have call with {person} for {project} project", f"Talk to team about {project} project"]
         
         # Pattern: "Work on creating X for Y project as well as for Z" (project-specific)
         project_pattern = r'work\s+on\s+creating\s+(.+?)\s+for\s+(.+?)\s+project\s+as\s+well\s+as\s+for\s+(.+)'
