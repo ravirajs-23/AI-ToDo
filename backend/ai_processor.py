@@ -75,14 +75,14 @@ class TaskProcessor:
                     raise ValueError("GEMINI_API_KEY not found in environment variables")
                 genai.configure(api_key=api_key)
                 self.model = genai.GenerativeModel('gemini-pro')
-                print("✅ Gemini client initialized successfully!")
+                print("[OK] Gemini client initialized successfully!")
                 
             else:
                 raise ValueError(f"Unsupported AI provider: {self.ai_provider}")
                 
         except Exception as e:
-            print(f"❌ Error initializing AI client: {e}")
-            print("🔄 Falling back to rule-based processing...")
+            print(f"[ERROR] Error initializing AI client: {e}")
+            print("[INFO] Falling back to rule-based processing...")
             self.client = None
             self.model = None
     
