@@ -313,6 +313,8 @@ def process_tasks():
         # Process tasks using AI
         result = task_processor.process_tasks(raw_text)
         
+        print(f"Processing result: {result}")  # Debug log
+        
         if result['success']:
             # Add AI provider info to the result
             result['ai_provider'] = ai_provider
@@ -333,6 +335,8 @@ def process_tasks():
             
             return jsonify(result)
         else:
+            # Log the error for debugging
+            print(f"Task processing failed: {result.get('message', 'Unknown error')}")
             return jsonify(result), 400
             
     except Exception as e:

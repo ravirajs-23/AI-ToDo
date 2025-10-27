@@ -86,7 +86,8 @@ const TodoApp = () => {
       }
     } catch (error) {
       console.error('Error processing tasks:', error);
-      setMessage('Error processing tasks. Make sure the backend is running.');
+      const errorMsg = error.response?.data?.message || error.message || 'Error processing tasks. Make sure the backend is running.';
+      setMessage(errorMsg);
       setAiProvider('');
     } finally {
       setLoading(false);

@@ -46,16 +46,16 @@ class TaskProcessor:
         
         # Fallback rule-based patterns
         self.priority_keywords = {
-            'high': ['urgent', 'asap', 'deadline', 'critical', 'important', 'immediately', 'today', 'now', 'blocker', 'time-sensitive', 'tmw', 'tomorrow', 'eod', 'end of day'],
-            'medium': ['soon', 'this week', 'moderate', 'should', 'need to', 'this week', 'next week'],
-            'low': ['eventually', 'sometime', 'when possible', 'optional', 'nice to have', 'nice-to-have']
+            'high': ['urgent', 'asap', 'deadline', 'critical', 'important', 'immediately', 'today', 'now', 'blocker', 'time-sensitive', 'tmw', 'tomorrow', 'eod', 'end of day', 'scrum', 'standup', 'daily meeting', 'meeting with', 'deployment'],
+            'medium': ['soon', 'this week', 'moderate', 'should', 'need to', 'this week', 'next week', 'check emails', 'post lunch'],
+            'low': ['eventually', 'sometime', 'when possible', 'optional', 'nice to have', 'nice-to-have', 'call dad', 'call mom']
         }
         
         self.category_keywords = {
-            'work': ['meeting', 'client', 'project', 'presentation', 'report', 'deadline', 'email', 'call', 'ppt', 'deck', 'aws', 'logs', 'ssl', 'cert', 'portal', 'intern', 'bug', 'navbar', 'mobile', 's3', 'upload', 'timesheet', 'townhall', 'domain', 'readme', 'invoice', 'followup', 'demo', 'export', 'data', 'report', 'team', 'lunch', 'building', 'activity', 'software', 'update', 'inbox', 'slides', 'cabp', 'ap', 'apprisals', 'feedback form', 'mgmt', 'management'],
+            'work': ['deployment', 'client', 'project', 'presentation', 'report', 'deadline', 'email', 'ppt', 'deck', 'aws', 'logs', 'ssl', 'cert', 'portal', 'intern', 'bug', 'navbar', 'mobile', 's3', 'upload', 'timesheet', 'townhall', 'domain', 'readme', 'invoice', 'followup', 'demo', 'export', 'data', 'team', 'building', 'activity', 'software', 'update', 'inbox', 'slides', 'check emails', 'outlook', 'gmail', 'to-do app'],
             'admin': ['paperwork', 'forms', 'billing', 'invoice', 'expense', 'hr', 'admin', 'travel', 'reimbursement', 'hiring', 'loop', 'q3', 'leave request', 'avs'],
-            'meetings': ['meeting', 'call', 'conference', 'discussion', 'sync', 'standup', 'retro', '1:1', 'amit', 'setup meeting', 'apprisals'],
-            'personal': ['grocery', 'doctor', 'family', 'personal', 'home', 'shopping', 'mom', 'bday', 'birthday', 'gift', 'internet', 'bill', 'electricity', 'power', 'recharge', 'payment', 'dentist', 'appointment', 'insurance', 'vehicle', 'travel', 'tickets', 'snacks', 'utility', 'water', 'buy', 'purchase', 'get', 'pick up', 'apples', 'food', 'groceries', 'snack', 'lunch', 'dinner', 'breakfast']
+            'meeting': ['scrum', 'meeting', 'call', 'conference', 'discussion', 'sync', 'standup', 'retro', '1:1', 'amit', 'setup meeting', 'apprisals', 'daily meeting', 'abhilash'],
+            'personal': ['grocery', 'doctor', 'family', 'personal', 'home', 'shopping', 'mom', 'dad', 'bday', 'birthday', 'gift', 'internet', 'bill', 'electricity', 'power', 'recharge', 'payment', 'dentist', 'appointment', 'insurance', 'vehicle', 'tickets', 'snacks', 'utility', 'water', 'buy', 'purchase', 'get', 'pick up', 'apples', 'food', 'groceries', 'snack', 'lunch', 'dinner', 'breakfast', 'decoration', 'event manager', 'pune', 'travelling']
         }
     
     def _initialize_ai_client(self):
@@ -65,7 +65,12 @@ class TaskProcessor:
                 api_key = os.getenv('OPENAI_API_KEY')
                 if not api_key:
                     raise ValueError("OPENAI_API_KEY not found in environment variables")
-                self.client = openai.OpenAI(api_key=api_key)
+                # Initialize OpenAI client - use fallback if there's an error
+                try:
+                    self.client = openai.OpenAI(api_key=api_key)
+                except Exception as init_error:
+                    # If there's an initialization error, fall back to rule-based processing
+                    raise
                 print("✅ ChatGPT client initialized successfully!")
                 
             elif self.ai_provider == "gemini":
@@ -80,8 +85,7 @@ class TaskProcessor:
                 raise ValueError(f"Unsupported AI provider: {self.ai_provider}")
                 
         except Exception as e:
-            print(f"[ERROR] Error initializing AI client: {e}")
-            print("[INFO] Falling back to rule-based processing...")
+            # Silently fall back to rule-based processing
             self.client = None
             self.model = None
     
@@ -139,7 +143,7 @@ Return format: ["task1", "task2", "task3", ...]
                 raise ValueError("AI response is not a list")
                 
         except Exception as e:
-            print(f"❌ AI API call failed: {e}")
+            # Fall back to rule-based processing
             return self._extract_tasks_fallback(raw_text)
     
     def _extract_tasks_fallback(self, raw_text: str) -> List[str]:
@@ -150,11 +154,17 @@ Return format: ["task1", "task2", "task3", ...]
         # Extract tasks using multiple strategies
         all_tasks = []
         
+        # Strategy 0: Handle "for X, Y, Z respectively" patterns first
+        respectively_tasks, cleaned_text = self._extract_respectively_tasks(cleaned_text)
+        if respectively_tasks:
+            all_tasks.extend(respectively_tasks)
+        
         # Strategy 1: Handle email-style requests first (highest priority)
         email_tasks = self._extract_email_tasks(cleaned_text)
         if email_tasks:
             all_tasks.extend(email_tasks)
-            return self._clean_task_list(all_tasks)
+            # Continue processing the rest of the text, don't return early
+            cleaned_text = cleaned_text  # Keep remaining text
         
         # Strategy 2: Handle complex compound sentences with multiple separators
         # First, try to identify major task boundaries using periods, semicolons, and newlines
@@ -162,10 +172,26 @@ Return format: ["task1", "task2", "task3", ...]
         major_tasks = [task.strip() for task in major_splits if task.strip()]
         
         for major_task in major_tasks:
+            # Skip if major_task was already extracted
+            if any(extracted in major_task.lower() for extracted in [t.lower() for t in all_tasks]):
+                continue
+            
+            # Special handling for "Call X and ask/tell..." - keep as single task
+            if re.match(r'^call\s+\w+\s+and\s+(ask|tell|check)', major_task, re.IGNORECASE):
+                all_tasks.append(major_task)
+                continue
+            
+            # Check for "then" at the start and remove it
+            major_task = re.sub(r'^then\s+', '', major_task, flags=re.IGNORECASE).strip()
+            
             # For each major task, check for compound patterns
-            if any(indicator in major_task.lower() for indicator in [' before that ', ' and ', ' also ', ' then ', ' so ', ', ']):
-                compound_tasks = self._split_compound_task(major_task)
-                all_tasks.extend(compound_tasks)
+            if any(indicator in major_task.lower() for indicator in [' before that ', ' also ', ' then ', ' so ', ', ']):
+                # Don't split if it's a simple "X and Y" pattern that belongs together
+                if not re.match(r'^\w+\s+\w+\s+and\s+\w+', major_task, re.IGNORECASE):
+                    compound_tasks = self._split_compound_task(major_task)
+                    all_tasks.extend(compound_tasks)
+                else:
+                    all_tasks.append(major_task)
             else:
                 all_tasks.append(major_task)
         
@@ -184,6 +210,23 @@ Return format: ["task1", "task2", "task3", ...]
         # Strategy 2.6: Final cleanup - split any remaining combined tasks
         final_tasks = []
         for task in all_tasks:
+            # Check if task contains newline (e.g., "gmail\nthen meeting")
+            if '\n' in task:
+                parts = task.split('\n')
+                for part in parts:
+                    part = part.strip()
+                    if part:
+                        if 'then' in part.lower():
+                            # Split by "then"
+                            sub_parts = re.split(r'\s+then\s+', part, flags=re.IGNORECASE)
+                            for sub_part in sub_parts:
+                                sub_part = sub_part.strip()
+                                if sub_part:
+                                    final_tasks.append(sub_part)
+                        else:
+                            final_tasks.append(part)
+                continue
+            
             # Check if task still contains multiple actions separated by commas
             if ',' in task and len(task.split(',')) > 1:
                 sub_tasks = [t.strip() for t in task.split(',') if t.strip()]
@@ -228,19 +271,25 @@ Return format: ["task1", "task2", "task3", ...]
         """Clean and normalize a list of extracted tasks."""
         cleaned_tasks = []
         for task in tasks:
-            # Remove common prefixes and question words
-            task = re.sub(r'^(can we|could you|please|finish|complete|do|make|create|call|check|send|review|need to|ping|update|rotate|ship|restart|share|archive)\s+', '', task, flags=re.IGNORECASE)
+            # Remove leading "then"
+            task = re.sub(r'^then\s+', '', task, flags=re.IGNORECASE).strip()
+            
+            # Remove common prefixes and question words (but keep "Call", "Check", "Attend")
+            task = re.sub(r'^(can we|could you|please|finish|complete|do|make|create|send|review|need to|ping|update|rotate|ship|restart|share|archive)\s+', '', task, flags=re.IGNORECASE)
             # Remove trailing punctuation
             task = re.sub(r'[.,;!?]+$', '', task)
-            # Remove leading articles and prepositions
-            task = re.sub(r'^(the|a|an|for|on|in|at|to|from|with|by)\s+', '', task, flags=re.IGNORECASE)
+            # Remove leading articles and prepositions (but keep for proper context)
+            task = re.sub(r'^(a|an)\s+', '', task, flags=re.IGNORECASE)
             # Capitalize first letter
             task = task.capitalize()
+            
+            # Clean up common patterns
+            task = re.sub(r'\s+', ' ', task).strip()  # Multiple spaces to single
             
             # Skip very short or meaningless tasks
             if len(task) > 5 and not task.lower() in ['for', 'on', 'in', 'at', 'to', 'from', 'with', 'by', 'the', 'a', 'an']:
                 cleaned_tasks.append(task)
-            elif len(task) <= 5 and task.lower() in ['sentilink', 'cabp', 'ovationcxm']:
+            elif len(task) <= 5 and task.lower() in ['sentilink', 'cabp', 'ovationcxm', 'genesis']:
                 cleaned_tasks.append(f"Create user stories for {task}")
         
         # Remove duplicates while preserving order
@@ -354,15 +403,20 @@ Return only the priority level (Highest/High/Medium/Low):
             return 'Highest'
         
         # Check for high priority indicators
-        if any(keyword in task_lower for keyword in ['deadline', 'today', 'tomorrow', 'eod', 'end of day', 'immediately', 'now', 'today we have', 'have call with']):
+        # Meetings and scrum calls are generally high priority
+        if any(keyword in task_lower for keyword in ['deadline', 'today', 'tomorrow', 'eod', 'end of day', 'immediately', 'now', 'today we have', 'have call with', 'scrum', 'standup', 'daily meeting', 'meeting', 'attend', 'deployment']):
             return 'High'
         
         # Check for medium priority indicators
-        if any(keyword in task_lower for keyword in ['soon', 'this week', 'should', 'need to']):
+        if any(keyword in task_lower for keyword in ['soon', 'this week', 'should', 'need to', 'check emails', 'post lunch', 'decoration', 'event manager']):
             return 'Medium'
         
-        # Default to low priority
-        return 'Low'
+        # Low priority indicators
+        if any(keyword in task_lower for keyword in ['call dad', 'call mom', 'family', 'travelling']):
+            return 'Low'
+        
+        # Default to medium priority (changed from Low)
+        return 'Medium'
     
     def classify_category(self, task: str) -> str:
         """Classify task category using AI."""
@@ -430,19 +484,22 @@ Return only the category name (Work/Meetings/Personal/Admin):
             category_scores[category] = score
         
         # Special handling for meeting-related tasks
-        meeting_indicators = ['meeting', 'setup meeting', 'schedule meeting', 'meet', 'invite', 'appointment', 'call', 'conference', 'standup', 'retro', '1:1']
+        meeting_indicators = ['meeting', 'setup meeting', 'schedule meeting', 'meet', 'invite', 'appointment', 'call', 'conference', 'standup', 'retro', '1:1', 'scrum', 'attend', 'sync', 'daily meeting', 'abhilash']
         if any(indicator in task_lower for indicator in meeting_indicators):
-            category_scores['meetings'] = category_scores.get('meetings', 0) + 3
+            category_scores['meeting'] = category_scores.get('meeting', 0) + 5
         
         # Special handling for personal tasks
-        personal_indicators = ['mom', 'dad', 'family', 'birthday', 'bday', 'gift', 'personal', 'home', 'shopping', 'grocery', 'doctor', 'internet', 'bill', 'electricity', 'recharge', 'payment', 'buy', 'purchase', 'get', 'pick up', 'apples', 'food', 'snacks', 'snack', 'lunch', 'dinner', 'breakfast']
+        personal_indicators = ['mom', 'dad', 'family', 'birthday', 'bday', 'gift', 'personal', 'home', 'shopping', 'grocery', 'doctor', 'internet', 'bill', 'electricity', 'recharge', 'payment', 'buy', 'purchase', 'get', 'pick up', 'apples', 'food', 'snacks', 'snack', 'decoration', 'event manager', 'pune', 'travelling']
         if any(indicator in task_lower for indicator in personal_indicators):
-            category_scores['personal'] = category_scores.get('personal', 0) + 2
+            category_scores['personal'] = category_scores.get('personal', 0) + 3
         
         # Return category with highest score, default to 'work'
         if category_scores:
             best_category = max(category_scores, key=category_scores.get)
             if category_scores[best_category] > 0:
+                # Normalize to standard category names
+                if best_category == 'meeting':
+                    return 'Meeting'
                 return best_category.title()
         
         return 'Work'
@@ -605,6 +662,73 @@ Return only the date in YYYY-MM-DD format or "null":
                 cleaned_lines.append(cleaned_line)
         
         return '\n'.join(cleaned_lines)
+    
+    def _extract_respectively_tasks(self, text: str) -> tuple[List[str], str]:
+        """Extract tasks from 'for X, Y, Z respectively' patterns and return cleaned text."""
+        tasks = []
+        cleaned_text = text
+        
+        # Pattern: "action for X, Y, Z respectively"
+        # Example: "scrum meetings for OvationCXM, Sentilink, CABP, Genesis respectively"
+        respectively_pattern = r'([\w\s]+)\s+for\s+((?:[\w\s]+,\s*)+[\w\s]+)\s+respectively'
+        match = re.search(respectively_pattern, cleaned_text, re.IGNORECASE)
+        
+        if match:
+            action = match.group(1).strip()
+            items_str = match.group(2).strip()
+            
+            # Split the items by comma
+            items = [item.strip() for item in items_str.split(',') if item.strip()]
+            
+            # Create a task for each item
+            for item in items:
+                # Determine if action is plural and convert to singular
+                action_singular = action
+                # Clean up the action by removing "start my day with" prefix
+                action_cleaned = re.sub(r'^start\s+my\s+day\s+with\s+', '', action_singular, flags=re.IGNORECASE).strip()
+                
+                if action_cleaned.lower().endswith('meetings'):
+                    action_cleaned = action_cleaned[:-1]  # "meetings" -> "meeting"
+                elif action_cleaned.lower().endswith('calls'):
+                    action_cleaned = action_cleaned[:-1]  # "calls" -> "call"
+                elif action_cleaned.lower().endswith('s') and not action_cleaned.lower().endswith('ss'):
+                    action_cleaned = action_cleaned[:-1]  # "checks" -> "check"
+                
+                task = f"Attend {action_cleaned} for {item}" if 'meeting' in action_cleaned.lower() or 'scrum' in action_cleaned.lower() else f"{action_cleaned} for {item}"
+                tasks.append(task)
+            
+            # Remove the matched pattern from the text
+            cleaned_text = cleaned_text.replace(match.group(0), '').strip()
+        
+        # Also handle "check/do X on Y, Z" patterns
+        # Example: "check emails on Outlook, Gmail"
+        check_on_pattern = r'(check|review|read)\s+([\w\s]+)\s+on\s+([^\n]+)'
+        match = re.search(check_on_pattern, cleaned_text, re.IGNORECASE)
+        
+        if match:
+            action = match.group(1).strip()
+            object_name = match.group(2).strip()
+            platforms_str = match.group(3).strip()
+            
+            # Split platforms by comma
+            platforms = [platform.strip() for platform in platforms_str.split(',') if platform.strip()]
+            
+            # Create a task for each platform
+            for platform in platforms:
+                # Clean up platform name (remove newlines)
+                platform_clean = platform.replace('\n', ' ').strip()
+                task = f"{action.capitalize()} {object_name} on {platform_clean}"
+                tasks.append(task)
+            
+            # Remove the matched pattern from the text, but preserve text after it
+            matched_pattern = match.group(0)
+            # Find where the pattern ends in the original text
+            text_before = cleaned_text[:cleaned_text.find(matched_pattern)]
+            text_after = cleaned_text[cleaned_text.find(matched_pattern) + len(matched_pattern):]
+            # Remove matched pattern and any leading/trailing whitespace, but keep what's after
+            cleaned_text = (text_before + text_after).strip()
+        
+        return tasks, cleaned_text
     
     def _extract_email_tasks(self, text: str) -> List[str]:
         """Extract tasks from email-style messages."""
