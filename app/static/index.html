@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI To-Do List</title>
+<link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>AI To-Do List</h1>
+      <p class="subtitle">Paste your scattered notes below. We'll organize, prioritize, and group them for you.</p>
+    </header>
+
+    <section class="input-card">
+      <textarea id="notes" placeholder="e.g. Finish PPT for Monday, check AWS logs, call client about invoice, submit expense report, book meeting room for standup..."></textarea>
+      <div class="actions">
+        <span id="status" class="status"></span>
+        <button id="organizeBtn">Organize my tasks</button>
+      </div>
+    </section>
+
+    <section id="results" class="results hidden">
+      <div class="results-header">
+        <h2>Your to-do list</h2>
+        <div class="filters">
+          <label><input type="checkbox" class="cat-filter" value="all" checked /> All</label>
+        </div>
+      </div>
+      <div id="groups"></div>
+    </section>
+
+    <footer>
+      <span id="source-tag"></span>
+    </footer>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

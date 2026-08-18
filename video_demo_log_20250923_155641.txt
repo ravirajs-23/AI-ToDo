@@ -1,5 +1,0 @@
-AI TO-DO LIST MANAGER - VIDEO DEMO LOG
-==================================================
-
-Demo completed at: 2025-09-23 15:56:41
-All E2E scenarios demonstrated successfully!
